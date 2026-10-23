@@ -40,6 +40,13 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   void _handleAuthState(AuthState state) {
+    debugPrint(
+      'SHOPFLOW AUTH EVENT: '
+      'event=${state.event}, '
+      'eventHasSession=${state.session != null}, '
+      'currentUser=${widget.authService.currentUser?.id ?? "null"}',
+    );
+
     if (!mounted) return;
 
     if (state.session == null) {
@@ -54,11 +61,10 @@ class _AuthGateState extends State<AuthGate> {
       return;
     }
 
-    // Refresh the shop check when a user signs in or the session changes.
+    // Check the shop when a session is first established.
+    // Token refreshes do not require another shop lookup.
     if (state.event == AuthChangeEvent.signedIn ||
-        state.event == AuthChangeEvent.initialSession ||
-        state.event == AuthChangeEvent.tokenRefreshed ||
-        state.event == AuthChangeEvent.userUpdated) {
+        state.event == AuthChangeEvent.initialSession) {
       _checkShop();
     }
   }
