@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../shared/theme/app_colors.dart';
 import '../../authentication/services/auth_service.dart';
 import '../../home/presentation/home_screen.dart';
+import '../../pos/presentation/pos_screen.dart';
+import '../../products/presentation/products_screen.dart';
 import 'command_centre_screen.dart';
 import 'shopflow_destination.dart';
 
@@ -22,14 +24,18 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
 
   bool _isSigningOut = false;
 
-  /// Opens the Command Centre drawer over the current screen.
+  /// Opens the Command Centre over the current screen.
   void _openCommandCentre() {
     if (_isSigningOut) return;
 
-    _scaffoldKey.currentState?.openDrawer();
+    final scaffold = _scaffoldKey.currentState;
+
+    if (scaffold == null || scaffold.isDrawerOpen) return;
+
+    scaffold.openDrawer();
   }
 
-  /// Navigates to the exact destination selected in the drawer.
+  /// Navigates to the destination selected in the Command Centre.
   void _navigateTo(ShopFlowDestination destination) {
     if (!mounted || _isSigningOut) return;
 
@@ -78,7 +84,7 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
       await AuthService().signOut();
 
       // AuthGate observes the Supabase authentication change
-      // and returns to the appropriate authentication screen.
+      // and returns the user to the appropriate screen.
     } catch (error, stackTrace) {
       debugPrint(
         'SHOPFLOW: Sign out failed: $error\n$stackTrace',
@@ -102,76 +108,57 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
     }
   }
 
-  void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '$feature will be implemented next.',
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     // IMPORTANT:
-    // This list follows the exact order of ShopFlowDestination.
-    // The index of each enum value determines which screen opens.
+    // This list must follow ShopFlowDestination exactly.
+    //
+    // The Command Centre is a drawer, so it is not included here.
     final screens = <Widget>[
-      const HomeScreen(), // home: index 0
-
-      const _ModulePlaceholder(
-        title: 'Point of Sale',
-        description: 'Your sales workspace will live here.',
-        icon: Icons.point_of_sale_rounded,
-      ), // pos: index 1
-
-      const _ModulePlaceholder(
-        title: 'Products',
-        description: 'Your product catalogue will live here.',
-        icon: Icons.inventory_2_outlined,
-      ), // products: index 2
+      const HomeScreen(),       // 0: home
+      const PosScreen(),        // 1: pos
+      ProductsScreen(),         // 2: products
 
       const _ModulePlaceholder(
         title: 'Inventory',
         description: 'View and manage your stock levels here.',
         icon: Icons.warehouse_outlined,
-      ), // inventory: index 3
+      ),                         // 3: inventory
 
       const _ModulePlaceholder(
         title: 'Categories',
         description: 'Organise your products into categories here.',
         icon: Icons.category_outlined,
-      ), // categories: index 4
+      ),                         // 4: categories
 
       const _ModulePlaceholder(
         title: 'Stock Movements',
         description:
             'Track stock additions, reductions, and adjustments here.',
         icon: Icons.swap_vert_rounded,
-      ), // stockMovements: index 5
+      ),                         // 5: stockMovements
 
       const _ModulePlaceholder(
         title: 'Sales History',
         description: 'Review your previous transactions here.',
         icon: Icons.receipt_long_outlined,
-      ), // salesHistory: index 6
+      ),                         // 6: salesHistory
 
       const _ModulePlaceholder(
         title: 'Reports',
         description:
             'Explore reports about your business performance here.',
         icon: Icons.bar_chart_rounded,
-      ), // reports: index 7
+      ),                         // 7: reports
 
       const _ModulePlaceholder(
         title: 'Settings',
         description: 'Manage ShopFlow preferences here.',
         icon: Icons.settings_outlined,
-      ), // settings: index 8
+      ),                         // 8: settings
     ];
 
-    // Catch accidental enum/screen mismatches during development.
+    // Detect accidental differences between the enum and screen list.
     assert(
       screens.length == ShopFlowDestination.values.length,
       'Every ShopFlowDestination must have a corresponding screen.',
@@ -181,7 +168,7 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
       key: _scaffoldKey,
       backgroundColor: AppColors.background,
 
-      // The Command Centre overlays the current screen.
+      // The Command Centre overlays the currently selected screen.
       drawer: CommandCentreScreen(
         onNavigate: _navigateTo,
         onSignOut: _signOut,
@@ -190,7 +177,7 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
 
       drawerEnableOpenDragGesture: true,
 
-      // Green AppBar with the ShopFlow brand centred.
+      // Shared green AppBar with a centred ShopFlow brand.
       appBar: AppBar(
         backgroundColor: AppColors.brand,
         foregroundColor: AppColors.textOnBrand,
@@ -198,11 +185,13 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
+
         leading: IconButton(
           tooltip: 'Open Command Centre',
           onPressed: _isSigningOut ? null : _openCommandCentre,
           icon: const Icon(Icons.menu_rounded),
         ),
+
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -226,6 +215,7 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
         ),
       ),
 
+      // Keeps the state of each destination while navigating.
       body: SafeArea(
         top: false,
         child: IndexedStack(
@@ -234,6 +224,8 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
         ),
       ),
 
+      // Home has the POS shortcut. Products manages its own
+      // Add Product button, so the shell must not duplicate it.
       floatingActionButton: _buildFloatingActionButton(),
 
       floatingActionButtonLocation:
@@ -241,67 +233,31 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
     );
   }
 
-  /// Displays the action relevant to the current screen.
+  /// Builds the primary floating action for the current screen.
   Widget? _buildFloatingActionButton() {
-    switch (_currentDestination) {
-      case ShopFlowDestination.home:
-        return _buildRoundActionButton(
+    if (_currentDestination != ShopFlowDestination.home) {
+      return null;
+    }
+
+    return Transform.translate(
+      offset: const Offset(0, -24),
+      child: SizedBox(
+        width: 64,
+        height: 64,
+        child: FloatingActionButton(
           heroTag: 'shopflow_home_pos',
           tooltip: 'Open Point of Sale',
-          icon: Icons.point_of_sale_rounded,
-          size: 64,
-          iconSize: 30,
-          onPressed: () {
-            _navigateTo(ShopFlowDestination.pos);
-          },
-        );
-
-      case ShopFlowDestination.products:
-        return _buildRoundActionButton(
-          heroTag: 'shopflow_add_product',
-          tooltip: 'Add product',
-          icon: Icons.add_rounded,
-          size: 56,
-          iconSize: 28,
-          onPressed: () {
-            _showComingSoon('Product creation');
-          },
-        );
-
-      default:
-        return null;
-    }
-  }
-
-  /// Builds a consistently styled circular floating action button.
-  ///
-  /// Transform.translate raises the button visually without
-  /// introducing a bottom navigation bar or changing screen content.
-  Widget _buildRoundActionButton({
-    required String heroTag,
-    required String tooltip,
-    required IconData icon,
-    required double size,
-    required double iconSize,
-    required VoidCallback onPressed,
-  }) {
-    return Transform.translate(
-      offset: const Offset(0, -16),
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: FloatingActionButton(
-          heroTag: heroTag,
-          tooltip: tooltip,
-          onPressed: _isSigningOut ? null : onPressed,
+          onPressed: _isSigningOut
+              ? null
+              : () => _navigateTo(ShopFlowDestination.pos),
           backgroundColor: AppColors.brand,
           foregroundColor: AppColors.textOnBrand,
           elevation: 4,
           highlightElevation: 6,
           shape: const CircleBorder(),
-          child: Icon(
-            icon,
-            size: iconSize,
+          child: const Icon(
+            Icons.point_of_sale_rounded,
+            size: 30,
           ),
         ),
       ),
@@ -309,7 +265,7 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
   }
 }
 
-/// Temporary presentation for modules that have not been implemented.
+/// Temporary presentation for modules that haven't been implemented.
 class _ModulePlaceholder extends StatelessWidget {
   const _ModulePlaceholder({
     required this.title,
