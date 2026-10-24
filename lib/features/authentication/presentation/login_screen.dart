@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/validation/email_validator.dart';
+import '../../../shared/theme/app_colors.dart';
 import '../services/auth_service.dart';
 import 'register_screen.dart';
 
@@ -10,6 +12,7 @@ class LoginScreen extends StatefulWidget {
     required this.authService,
   });
 
+  // AuthGate supplies the existing authentication service.
   final AuthService authService;
 
   @override
@@ -29,6 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _errorMessage;
   String? _infoMessage;
 
+  // Normalize the email before sending it to Supabase.
   String get _email => _emailController.text.trim().toLowerCase();
 
   @override
@@ -37,6 +41,10 @@ class _LoginScreenState extends State<LoginScreen> {
     _passwordController.dispose();
     super.dispose();
   }
+
+  // ---------------------------------------------------------------------------
+  // NAVIGATION
+  // ---------------------------------------------------------------------------
 
   Future<void> _openRegistration() async {
     final result = await Navigator.of(context).push<String>(
@@ -49,6 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!mounted) return;
 
+    // Prefill the email returned by the registration screen.
     if (result != null && result.isNotEmpty) {
       _emailController.text = result;
       _passwordController.clear();
@@ -62,7 +71,28 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _openPasswordRecovery() {
+    // TODO: Replace with the actual password-recovery flow.
+    // This placeholder does not send a reset email yet.
+    FocusScope.of(context).unfocus();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Password recovery is coming next.'),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // SIGN IN
+  // ---------------------------------------------------------------------------
+
   Future<void> _signIn() async {
+    if (_isLoading) return;
+
+    FocusScope.of(context).unfocus();
+
+    // Validate before contacting Supabase.
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -73,12 +103,17 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
+      // AuthService handles authentication.
+      // AuthGate listens for the resulting session change.
       await widget.authService.signIn(
         email: _email,
         password: _passwordController.text,
       );
-    } catch (error) {
+    } catch (error, stackTrace) {
       if (!mounted) return;
+
+      debugPrint('SHOPFLOW: Sign-in failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
 
       final message = _friendlyError(error);
       final normalizedMessage = message.toLowerCase();
@@ -99,14 +134,21 @@ class _LoginScreenState extends State<LoginScreen> {
       });
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // RESEND VERIFICATION
+  // ---------------------------------------------------------------------------
+
   Future<void> _resendVerification() async {
-    if (_email.isEmpty ||
-        !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(_email)) {
+    if (_resending) return;
+
+    if (!EmailValidator.isValid(_email)) {
       setState(() {
         _errorMessage = 'Enter a valid email address first.';
       });
@@ -120,7 +162,9 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      await widget.authService.resendSignupConfirmation(email: _email);
+      await widget.authService.resendSignupConfirmation(
+        email: _email,
+      );
 
       if (!mounted) return;
 
@@ -128,27 +172,38 @@ class _LoginScreenState extends State<LoginScreen> {
         _infoMessage =
             'If this account needs confirmation, a new verification email '
             'may arrive shortly. Check your inbox and spam folder.';
+
         _emailNeedsVerification = false;
       });
-    } catch (error) {
+    } catch (error, stackTrace) {
       if (!mounted) return;
+
+      debugPrint('SHOPFLOW: Verification resend failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
 
       setState(() {
         _errorMessage = _friendlyError(error);
       });
     } finally {
       if (mounted) {
-        setState(() => _resending = false);
+        setState(() {
+          _resending = false;
+        });
       }
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // ERROR HANDLING
+  // ---------------------------------------------------------------------------
 
   String _friendlyError(Object error) {
     if (error is AuthException) {
       final message = error.message.toLowerCase();
 
       if (message.contains('invalid login credentials')) {
-        return 'The email or password is incorrect. Check your details and try again.';
+        return 'The email or password is incorrect. '
+            'Check your details and try again.';
       }
 
       if (message.contains('rate limit') ||
@@ -162,182 +217,372 @@ class _LoginScreenState extends State<LoginScreen> {
     return 'Unable to sign in. Check your internet connection and try again.';
   }
 
+  void _clearMessages() {
+    if (_errorMessage == null &&
+        _infoMessage == null &&
+        !_emailNeedsVerification) {
+      return;
+    }
+
+    setState(() {
+      _errorMessage = null;
+      _infoMessage = null;
+      _emailNeedsVerification = false;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // RESPONSIVE LAYOUT — NO SCROLL VIEW
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
+
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Icon(
-                      Icons.storefront_rounded,
-                      size: 68,
-                      color: Color(0xFF176B55),
-                    ),
-                    const SizedBox(height: 20),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final keyboardVisible =
+                MediaQuery.viewInsetsOf(context).bottom > 0;
 
-                    Text(
-                      'Welcome back',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
+            final compact = constraints.maxHeight < 680 ||
+                keyboardVisible;
 
-                    Text(
-                      'Sign in to manage your shop.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    const SizedBox(height: 32),
+            final tight = constraints.maxHeight < 430;
 
-                    TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      autofillHints: const [AutofillHints.email],
-                      decoration: const InputDecoration(
-                        labelText: 'Email address',
-                        prefixIcon: Icon(Icons.email_outlined),
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (_) {
-                        if (_emailNeedsVerification || _errorMessage != null) {
-                          setState(() {
-                            _emailNeedsVerification = false;
-                            _errorMessage = null;
-                          });
-                        }
-                      },
-                      validator: (value) {
-                        final email = value?.trim() ?? '';
+            final horizontalPadding =
+                constraints.maxWidth < 360 ? 20.0 : 24.0;
 
-                        if (email.isEmpty) {
-                          return 'Enter your email address.';
-                        }
+            final verticalPadding = keyboardVisible
+                ? 2.0
+                : tight
+                    ? 4.0
+                    : compact
+                        ? 8.0
+                        : 24.0;
 
-                        if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
-                            .hasMatch(email)) {
-                          return 'Enter a valid email address.';
-                        }
+            return Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: horizontalPadding,
+                vertical: verticalPadding,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: 400,
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Hide the brand when space is limited.
+                        if (!keyboardVisible) ...[
+                          _buildBrand(compact: compact),
+                          SizedBox(height: compact ? 16 : 28),
+                        ],
 
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
+                        Text(
+                          'Welcome back',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineMedium
+                              ?.copyWith(
+                                fontSize: compact ? 24 : 28,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
 
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      textInputAction: TextInputAction.done,
-                      autofillHints: const [AutofillHints.password],
-                      decoration: InputDecoration(
-                        labelText: 'Password',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          tooltip:
-                              _obscurePassword ? 'Show password' : 'Hide password',
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
+                        if (!keyboardVisible) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'Sign in to continue.',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+
+                        SizedBox(
+                          height: keyboardVisible
+                              ? 12
+                              : compact
+                                  ? 16
+                                  : 24,
+                        ),
+
+                        // EMAIL
+                        TextFormField(
+                          controller: _emailController,
+                          enabled: !_isLoading,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          autofillHints: const [
+                            AutofillHints.username,
+                            AutofillHints.email,
+                          ],
+                          autocorrect: false,
+                          decoration: _inputDecoration(
+                            label: 'Email address',
+                            icon: Icons.mail_outline_rounded,
+                            compact: compact,
+                          ),
+                          onChanged: (_) => _clearMessages(),
+                          validator: (value) {
+                            if (!EmailValidator.isValid(value ?? '')) {
+                              return 'Enter a valid email address.';
+                            }
+
+                            return null;
                           },
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
+                        ),
+
+                        SizedBox(height: compact ? 10 : 16),
+
+                        // PASSWORD
+                        TextFormField(
+                          controller: _passwordController,
+                          enabled: !_isLoading,
+                          obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          autofillHints: const [
+                            AutofillHints.password,
+                          ],
+                          decoration: _inputDecoration(
+                            label: 'Password',
+                            icon: Icons.lock_outline_rounded,
+                            compact: compact,
+                            suffix: IconButton(
+                              tooltip: _obscurePassword
+                                  ? 'Show password'
+                                  : 'Hide password',
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
+                            ),
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Enter your password.';
+                            }
+
+                            return null;
+                          },
+                          onChanged: (_) {
+                            if (_errorMessage != null) {
+                              setState(() {
+                                _errorMessage = null;
+                                _emailNeedsVerification = false;
+                              });
+                            }
+                          },
+                          onFieldSubmitted: (_) => _signIn(),
+                        ),
+
+                        // Secondary action.
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            style: TextButton.styleFrom(
+                              minimumSize: Size(0, compact ? 32 : 40),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              tapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            onPressed: _isLoading || _resending
+                                ? null
+                                : _openPasswordRecovery,
+                            child: const Text('Forgot password?'),
                           ),
                         ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Enter your password.';
-                        }
-                        return null;
-                      },
-                      onFieldSubmitted: (_) => _signIn(),
-                    ),
 
-                    if (_errorMessage != null) ...[
-                      const SizedBox(height: 16),
-                      _MessageBox(
-                        message: _errorMessage!,
-                        isError: true,
-                      ),
-                    ],
+                        if (_errorMessage != null) ...[
+                          const SizedBox(height: 8),
+                          _MessageBox(
+                            message: _errorMessage!,
+                            isError: true,
+                          ),
+                        ],
 
-                    if (_infoMessage != null) ...[
-                      const SizedBox(height: 16),
-                      _MessageBox(
-                        message: _infoMessage!,
-                        isError: false,
-                      ),
-                    ],
+                        if (_infoMessage != null) ...[
+                          const SizedBox(height: 8),
+                          _MessageBox(
+                            message: _infoMessage!,
+                            isError: false,
+                          ),
+                        ],
 
-                    if (_emailNeedsVerification) ...[
-                      const SizedBox(height: 12),
-                      OutlinedButton.icon(
-                        onPressed: _resending ? null : _resendVerification,
-                        icon: const Icon(Icons.mark_email_read_outlined),
-                        label: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: _resending
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
+                        if (_emailNeedsVerification) ...[
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            onPressed:
+                                _resending ? null : _resendVerification,
+                            icon: _resending
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.mark_email_read_outlined,
                                   ),
-                                )
-                              : const Text('Resend verification email'),
+                            label: Text(
+                              _resending
+                                  ? 'Sending verification email...'
+                                  : 'Resend verification email',
+                            ),
+                          ),
+                        ],
+
+                        SizedBox(height: compact ? 10 : 18),
+
+                        // Primary action.
+                        FilledButton(
+                          onPressed: _isLoading ? null : _signIn,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 160),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    key: ValueKey('signing-in'),
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.textOnBrand,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Sign in',
+                                    key: ValueKey('sign-in'),
+                                  ),
+                          ),
                         ),
-                      ),
-                    ],
 
-                    const SizedBox(height: 24),
-
-                    FilledButton(
-                      onPressed: _isLoading ? null : _signIn,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                        // Keep registration available, but hide it while
+                        // the keyboard occupies most of the viewport.
+                        if (!keyboardVisible) ...[
+                          SizedBox(height: compact ? 4 : 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'New to ShopFlow?',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium,
                                 ),
-                              )
-                            : const Text('Sign in'),
-                      ),
+                              ),
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  minimumSize: Size(
+                                    0,
+                                    compact ? 36 : 44,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                  ),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: _isLoading
+                                    ? null
+                                    : _openRegistration,
+                                child: const Text('Create account'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
                     ),
-
-                    const SizedBox(height: 12),
-
-                    TextButton(
-                      onPressed: _isLoading ? null : _openRegistration,
-                      child: const Text("New to ShopFlow? Create an account"),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // SHARED FIELD STYLING
+  // ---------------------------------------------------------------------------
+
+  InputDecoration _inputDecoration({
+    required String label,
+    required IconData icon,
+    required bool compact,
+    Widget? suffix,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon),
+      suffixIcon: suffix,
+      isDense: compact,
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: compact ? 12 : 16,
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // BRAND MARK
+  // ---------------------------------------------------------------------------
+
+  Widget _buildBrand({
+    required bool compact,
+  }) {
+    final size = compact ? 40.0 : 48.0;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: AppColors.brand,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(
+            Icons.storefront_rounded,
+            color: AppColors.textOnBrand,
+            size: compact ? 23 : 27,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'ShopFlow',
+          style: TextStyle(
+            fontSize: compact ? 19 : 21,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
+            color: AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
 }
+
+// -----------------------------------------------------------------------------
+// STATUS MESSAGE
+// -----------------------------------------------------------------------------
 
 class _MessageBox extends StatelessWidget {
   const _MessageBox({
@@ -352,20 +597,39 @@ class _MessageBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = isError
         ? Theme.of(context).colorScheme.error
-        : const Color(0xFF176B55);
+        : AppColors.brand;
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: color.withValues(alpha: 0.35),
+          color: color.withValues(alpha: 0.25),
         ),
       ),
-      child: Text(
-        message,
-        style: TextStyle(color: color),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            isError
+                ? Icons.error_outline_rounded
+                : Icons.check_circle_outline_rounded,
+            size: 19,
+            color: color,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: color,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

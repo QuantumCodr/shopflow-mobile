@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/validation/email_validator.dart';
 import '../data/auth_repository.dart';
 
 class AuthService {
@@ -9,11 +10,14 @@ class AuthService {
 
   final AuthRepository _repository;
 
+  // Exposes the currently authenticated user.
   User? get currentUser => _repository.currentUser;
 
+  // Exposes authentication changes from Supabase.
   Stream<AuthState> get authStateChanges =>
       _repository.authStateChanges;
 
+  /// Creates a new user account.
   Future<AuthResponse> register({
     required String fullName,
     required String email,
@@ -26,8 +30,10 @@ class AuthService {
       throw const AuthException('Please enter your full name.');
     }
 
-    if (!_isValidEmail(normalizedEmail)) {
-      throw const AuthException('Please enter a valid email address.');
+    if (!EmailValidator.isValid(normalizedEmail)) {
+      throw const AuthException(
+        'Please enter a valid email address.',
+      );
     }
 
     if (password.length < 8) {
@@ -43,20 +49,25 @@ class AuthService {
     );
   }
 
+  /// Signs in an existing user.
   Future<AuthResponse> signIn({
     required String email,
     required String password,
   }) async {
     final stopwatch = Stopwatch()..start();
 
-    final normalizedEmail = email.trim().toLowerCase();
+    final normalizedEmail = _normalizeEmail(email);
 
-    if (!_isValidEmail(normalizedEmail)) {
-      throw const AuthException('Please enter a valid email address.');
+    if (!EmailValidator.isValid(normalizedEmail)) {
+      throw const AuthException(
+        'Please enter a valid email address.',
+      );
     }
 
     if (password.isEmpty) {
-      throw const AuthException('Please enter your password.');
+      throw const AuthException(
+        'Please enter your password.',
+      );
     }
 
     try {
@@ -76,13 +87,16 @@ class AuthService {
     }
   }
 
+  /// Resends the signup confirmation email.
   Future<void> resendSignupConfirmation({
     required String email,
   }) async {
     final normalizedEmail = _normalizeEmail(email);
 
-    if (!_isValidEmail(normalizedEmail)) {
-      throw const AuthException('Please enter a valid email address.');
+    if (!EmailValidator.isValid(normalizedEmail)) {
+      throw const AuthException(
+        'Please enter a valid email address.',
+      );
     }
 
     await _repository.resendSignupConfirmation(
@@ -90,13 +104,14 @@ class AuthService {
     );
   }
 
+  /// Checks whether the current user owns a shop.
   Future<bool> hasShop() => _repository.hasShop();
 
+  /// Signs out the current user.
   Future<void> signOut() => _repository.signOut();
 
-  String _normalizeEmail(String email) => email.trim().toLowerCase();
-
-  bool _isValidEmail(String email) {
-    return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email);
+  /// Trims whitespace and makes the email lowercase.
+  String _normalizeEmail(String email) {
+    return email.trim().toLowerCase();
   }
 }

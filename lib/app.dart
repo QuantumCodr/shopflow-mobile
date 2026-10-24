@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import 'features/authentication/presentation/auth_gate.dart';
 import 'features/authentication/services/auth_service.dart';
 import 'features/shop_setup/services/shop_service.dart';
+import 'shared/theme/app_colors.dart';
+import 'shared/theme/app_theme.dart';
 
-const Color shopFlowGreen = Color(0xFF176B55);
-const Color shopFlowBackground = Color(0xFFF6F8F7);
+// Temporary aliases maintained for existing widgets.
+// New widgets should use AppColors directly.
+const Color shopFlowGreen = AppColors.brand;
+const Color shopFlowBackground = AppColors.background;
 
 class ShopFlowApp extends StatelessWidget {
   const ShopFlowApp({super.key});
@@ -15,20 +19,10 @@ class ShopFlowApp extends StatelessWidget {
     return MaterialApp(
       title: 'ShopFlow',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: shopFlowGreen,
-        ),
-        scaffoldBackgroundColor: shopFlowBackground,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: shopFlowBackground,
-          surfaceTintColor: Colors.transparent,
-        ),
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-        ),
-      ),
+
+      // Apply the shared ShopFlow design system.
+      theme: AppTheme.light,
+
       home: AuthGate(
         authService: AuthService(),
         shopService: ShopService(),
@@ -37,6 +31,10 @@ class ShopFlowApp extends StatelessWidget {
     );
   }
 }
+
+// -----------------------------------------------------------------------------
+// MAIN APPLICATION SHELL
+// -----------------------------------------------------------------------------
 
 class ShopFlowShell extends StatefulWidget {
   const ShopFlowShell({super.key});
@@ -149,6 +147,10 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
     );
   }
 }
+
+// -----------------------------------------------------------------------------
+// HOME SCREEN
+// -----------------------------------------------------------------------------
 
 class ShopFlowHomeScreen extends StatelessWidget {
   const ShopFlowHomeScreen({
@@ -286,6 +288,10 @@ class ShopFlowHomeScreen extends StatelessWidget {
   }
 }
 
+// -----------------------------------------------------------------------------
+// QUICK ACTION CARD
+// -----------------------------------------------------------------------------
+
 class QuickActionCard extends StatelessWidget {
   const QuickActionCard({
     super.key,
@@ -331,6 +337,10 @@ class QuickActionCard extends StatelessWidget {
     );
   }
 }
+
+// -----------------------------------------------------------------------------
+// COMMAND CENTRE
+// -----------------------------------------------------------------------------
 
 class ShopFlowCommandCentre extends StatelessWidget {
   const ShopFlowCommandCentre({super.key});
@@ -425,7 +435,9 @@ class ShopFlowCommandCentre extends StatelessWidget {
             ),
             title: const Text(
               'Sign Out',
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(
+                color: Colors.red,
+              ),
             ),
             onTap: () => _confirmSignOut(context),
           ),
@@ -494,6 +506,10 @@ class ShopFlowCommandCentre extends StatelessWidget {
   }
 }
 
+// -----------------------------------------------------------------------------
+// COMMAND SECTION
+// -----------------------------------------------------------------------------
+
 class CommandSection extends StatelessWidget {
   const CommandSection({
     super.key,
@@ -536,6 +552,10 @@ class CommandSection extends StatelessWidget {
     );
   }
 }
+
+// -----------------------------------------------------------------------------
+// COMMAND ITEM
+// -----------------------------------------------------------------------------
 
 class CommandItem extends StatelessWidget {
   const CommandItem({
@@ -589,6 +609,10 @@ class CommandItem extends StatelessWidget {
     );
   }
 }
+
+// -----------------------------------------------------------------------------
+// PLACEHOLDER SCREEN
+// -----------------------------------------------------------------------------
 
 class PlaceholderScreen extends StatelessWidget {
   const PlaceholderScreen({
