@@ -5,6 +5,7 @@ import '../../authentication/services/auth_service.dart';
 import '../../home/presentation/home_screen.dart';
 import '../../pos/presentation/pos_screen.dart';
 import '../../products/presentation/products_screen.dart';
+import '../../inventory/presentation/inventory_screen.dart';
 import 'command_centre_screen.dart';
 import 'shopflow_destination.dart';
 
@@ -110,52 +111,47 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
 
   @override
   Widget build(BuildContext context) {
-    // IMPORTANT:
-    // This list must follow ShopFlowDestination exactly.
-    //
-    // The Command Centre is a drawer, so it is not included here.
+        // IMPORTANT:
+        // This list must follow ShopFlowDestination exactly.
+        //
+        // The Command Centre is a drawer, so it is not included here.
     final screens = <Widget>[
-      const HomeScreen(),       // 0: home
-      const PosScreen(),        // 1: pos
-      ProductsScreen(),         // 2: products
-
-      const _ModulePlaceholder(
-        title: 'Inventory',
-        description: 'View and manage your stock levels here.',
-        icon: Icons.warehouse_outlined,
-      ),                         // 3: inventory
+      const HomeScreen(), // 0: home
+      const PosScreen(), // 1: pos
+      ProductsScreen(), // 2: products
+      InventoryScreen(), // 3: inventory
 
       const _ModulePlaceholder(
         title: 'Categories',
         description: 'Organise your products into categories here.',
         icon: Icons.category_outlined,
-      ),                         // 4: categories
+      ), // 4: categories
 
       const _ModulePlaceholder(
         title: 'Stock Movements',
         description:
             'Track stock additions, reductions, and adjustments here.',
         icon: Icons.swap_vert_rounded,
-      ),                         // 5: stockMovements
+      ), // 5: stockMovements
 
       const _ModulePlaceholder(
         title: 'Sales History',
         description: 'Review your previous transactions here.',
         icon: Icons.receipt_long_outlined,
-      ),                         // 6: salesHistory
+      ), // 6: salesHistory
 
       const _ModulePlaceholder(
         title: 'Reports',
         description:
             'Explore reports about your business performance here.',
         icon: Icons.bar_chart_rounded,
-      ),                         // 7: reports
+      ), // 7: reports
 
       const _ModulePlaceholder(
         title: 'Settings',
         description: 'Manage ShopFlow preferences here.',
         icon: Icons.settings_outlined,
-      ),                         // 8: settings
+      ), // 8: settings
     ];
 
     // Detect accidental differences between the enum and screen list.
