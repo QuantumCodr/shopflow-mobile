@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'features/authentication/presentation/auth_gate.dart';
 import 'features/authentication/services/auth_service.dart';
+import 'features/shop_setup/services/shop_service.dart';
 
 const Color shopFlowGreen = Color(0xFF176B55);
 const Color shopFlowBackground = Color(0xFFF6F8F7);
@@ -30,6 +31,7 @@ class ShopFlowApp extends StatelessWidget {
       ),
       home: AuthGate(
         authService: AuthService(),
+        shopService: ShopService(),
         authenticatedBuilder: (_) => const ShopFlowShell(),
       ),
     );
