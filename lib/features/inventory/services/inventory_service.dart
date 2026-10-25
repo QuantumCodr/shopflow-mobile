@@ -52,6 +52,67 @@ class InventoryService {
           : reason!.trim(),
     );
   }
+
+  Future<void> adjustStock({
+    required String productId,
+    required String movementType,
+    required String quantityInput,
+    required String reason,
+    String? referenceId,
+  }) async {
+    const allowedTypes = {
+      'adjustment_in',
+      'adjustment_out',
+      'damaged',
+      'returned',
+    };
+
+    if (!allowedTypes.contains(movementType)) {
+      throw const InventoryValidationException(
+        'Select a valid stock adjustment type.',
+      );
+    }
+
+    final value = quantityInput.trim();
+
+    if (!RegExp(r'^\d+(?:\.\d{1,3})?$').hasMatch(value)) {
+      throw const InventoryValidationException(
+        'Enter a valid quantity with up to three decimal places.',
+      );
+    }
+
+    final quantity = double.tryParse(value);
+
+    if (quantity == null ||
+        !quantity.isFinite ||
+        quantity <= 0) {
+      throw const InventoryValidationException(
+        'Quantity must be greater than zero.',
+      );
+    }
+
+    final cleanReason = reason.trim();
+
+    if (cleanReason.isEmpty) {
+      throw const InventoryValidationException(
+        'Enter a reason for this adjustment.',
+      );
+    }
+
+    if (cleanReason.length > 500) {
+      throw const InventoryValidationException(
+        'The reason cannot exceed 500 characters.',
+      );
+    }
+
+    await _repository.adjustStock(
+      productId: productId,
+      movementType: movementType,
+      quantity: quantity,
+      reason: cleanReason,
+      referenceId: referenceId,
+    );
+  }  
 }
 
 class InventoryValidationException implements Exception {

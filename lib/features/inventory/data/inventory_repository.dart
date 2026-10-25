@@ -114,6 +114,36 @@ class InventoryRepository {
       );
     }
   }
+
+  Future<void> adjustStock({
+    required String productId,
+    required String movementType,
+    required double quantity,
+    required String reason,
+    String? referenceId,
+  }) async {
+    try {
+      final shopId = await _getCurrentShopId();
+
+      await _client.rpc(
+        'adjust_stock',
+        params: {
+          'p_shop_id': shopId,
+          'p_product_id': productId,
+          'p_movement_type': movementType,
+          'p_quantity': quantity,
+          'p_reason': reason,
+          'p_reference_id': referenceId,
+        },
+      );
+    } on InventoryRepositoryException {
+      rethrow;
+    } on PostgrestException catch (error) {
+      throw InventoryRepositoryException(
+        'Could not adjust stock: ${error.message}',
+      );
+    }
+  }  
 }
 
 class InventoryRepositoryException implements Exception {

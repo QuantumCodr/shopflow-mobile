@@ -40,6 +40,58 @@ abstract final class AppTheme {
 
       visualDensity: VisualDensity.standard,
 
+      // =====================================================
+      // SCROLLBAR
+      // =====================================================
+
+      scrollbarTheme: ScrollbarThemeData(
+        thickness: WidgetStateProperty.resolveWith<double?>(
+          (states) {
+            if (states.contains(WidgetState.dragged)) {
+              return 5;
+            }
+
+            if (states.contains(WidgetState.hovered)) {
+              return 4;
+            }
+
+            return 3;
+          },
+        ),
+
+        radius: const Radius.circular(8),
+
+        thumbColor: WidgetStateProperty.resolveWith<Color?>(
+          (states) {
+            if (states.contains(WidgetState.dragged)) {
+              return AppColors.brand;
+            }
+
+            if (states.contains(WidgetState.hovered)) {
+              return AppColors.brand.withValues(alpha: 0.75);
+            }
+
+            return AppColors.brand.withValues(alpha: 0.45);
+          },
+        ),
+
+        trackColor: const WidgetStatePropertyAll<Color?>(
+          Colors.transparent,
+        ),
+
+        trackBorderColor: const WidgetStatePropertyAll<Color?>(
+          Colors.transparent,
+        ),
+
+        crossAxisMargin: 2,
+        mainAxisMargin: 4,
+        interactive: true,
+      ),
+
+      // =====================================================
+      // APP BAR
+      // =====================================================
+
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.background,
         foregroundColor: AppColors.textPrimary,
@@ -54,6 +106,10 @@ abstract final class AppTheme {
           letterSpacing: -0.3,
         ),
       ),
+
+      // =====================================================
+      // TYPOGRAPHY
+      // =====================================================
 
       textTheme: const TextTheme(
         displaySmall: TextStyle(
@@ -119,6 +175,10 @@ abstract final class AppTheme {
         ),
       ),
 
+      // =====================================================
+      // INPUT FIELDS
+      // =====================================================
+
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,
@@ -169,6 +229,10 @@ abstract final class AppTheme {
         ),
       ),
 
+      // =====================================================
+      // FILLED BUTTONS
+      // =====================================================
+
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           minimumSize: const Size(0, 52),
@@ -185,6 +249,10 @@ abstract final class AppTheme {
           ),
         ),
       ),
+
+      // =====================================================
+      // OUTLINED BUTTONS
+      // =====================================================
 
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
@@ -205,6 +273,10 @@ abstract final class AppTheme {
         ),
       ),
 
+      // =====================================================
+      // TEXT BUTTONS
+      // =====================================================
+
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           minimumSize: const Size(44, 44),
@@ -216,11 +288,19 @@ abstract final class AppTheme {
         ),
       ),
 
+      // =====================================================
+      // DIVIDERS
+      // =====================================================
+
       dividerTheme: const DividerThemeData(
         color: AppColors.divider,
         thickness: 1,
         space: 1,
       ),
+
+      // =====================================================
+      // NAVIGATION BAR
+      // =====================================================
 
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: AppColors.surface,
@@ -237,6 +317,10 @@ abstract final class AppTheme {
         ),
       ),
 
+      // =====================================================
+      // SNACKBARS
+      // =====================================================
+
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.textPrimary,
@@ -248,6 +332,10 @@ abstract final class AppTheme {
           borderRadius: BorderRadius.circular(14),
         ),
       ),
+
+      // =====================================================
+      // DIALOGS
+      // =====================================================
 
       dialogTheme: DialogThemeData(
         backgroundColor: AppColors.surface,
@@ -266,6 +354,10 @@ abstract final class AppTheme {
           color: AppColors.textSecondary,
         ),
       ),
+
+      // =====================================================
+      // PROGRESS INDICATORS
+      // =====================================================
 
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: AppColors.brand,
