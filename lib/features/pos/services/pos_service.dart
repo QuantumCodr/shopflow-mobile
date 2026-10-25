@@ -21,7 +21,7 @@ class PosService {
   final ProductService _productService;
   final PosRepository _repository;
 
-  /// Combines active products with their available inventory quantities.
+  /// Combines active products with their recorded stock levels.
   Future<List<PosCatalogItem>> loadCatalog() async {
     final products = await _productService.getActiveProducts();
 
@@ -36,13 +36,10 @@ class PosService {
         product: product,
         availableQuantity: stockLevels[product.id] ?? 0,
       );
-    }).toList();
+    }).toList(growable: false);
   }
 
-  /// Validates the cart and records the sale.
-  ///
-  /// PostgreSQL remains responsible for the authoritative stock check
-  /// because the stock could change after the catalogue was loaded.
+  /// Validates a cart and submits it for authoritative processing by PostgreSQL.
   Future<PosReceipt> completeSale({
     required List<PosCartLine> lines,
     required int paymentAmount,
@@ -76,17 +73,15 @@ class PosService {
       }
     }
 
-    final subtotal = lines.fold<int>(
+    // This is a preliminary client-side check, not the authoritative total.
+    final estimatedTotal = lines.fold<int>(
       0,
       (sum, line) => sum + line.lineTotal,
     );
 
-    // Version 1 has no tax or discount calculations.
-    final total = subtotal;
-
-    if (paymentAmount < total) {
+    if (paymentAmount < estimatedTotal) {
       throw const PosServiceException(
-        'The amount received is less than the total due.',
+        'The amount received is less than the displayed total.',
       );
     }
 
@@ -95,13 +90,15 @@ class PosService {
         'product_id': line.product.id,
         'quantity': line.quantity,
       };
-    }).toList();
+    }).toList(growable: false);
 
     final response = await _repository.completeSale(
       items: items,
       paymentAmount: paymentAmount,
     );
 
+    // The receipt is built from the database's response, not from a
+    // client-generated sale number or a client-calculated final total.
     return PosReceipt.fromMap(response);
   }
 }

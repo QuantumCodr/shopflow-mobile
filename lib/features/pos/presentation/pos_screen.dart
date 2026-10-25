@@ -16,14 +16,15 @@ import '../services/pos_service.dart';
 /// Responsibilities:
 /// - Display active products and available stock.
 /// - Search the catalogue by product name or SKU.
-/// - Maintain a cart and calculate its total.
+/// - Maintain a cart and calculate its displayed total.
+/// - Present cart review using a draggable bottom sheet.
 /// - Validate payment input before submitting a sale.
 /// - Display the receipt returned by the service.
 /// - Refresh when another feature announces a persisted change.
 ///
 /// Prices and monetary calculations use minor units.
 /// Stock and sale business rules remain in PosService
-/// and the database.
+/// and PostgreSQL.
 class PosScreen extends StatefulWidget {
   const PosScreen({
     super.key,
@@ -88,11 +89,7 @@ class _PosScreenState extends State<PosScreen> {
   // STATE MANAGEMENT AND CATALOGUE
   // =========================================================
 
-  /// Reload the catalogue when another feature successfully
-  /// persists a change.
-  ///
-  /// Inventory adjustments and product updates therefore become
-  /// visible in POS without requiring a manual refresh.
+  /// Refresh after another feature successfully persists a change.
   void _handleDataRevisionChanged() {
     if (!mounted) return;
 
@@ -122,7 +119,6 @@ class _PosScreenState extends State<PosScreen> {
         return;
       }
 
-      // Keep the cart consistent with the latest catalogue.
       final reconciliation = _reconcileCart(catalog);
 
       setState(() {
@@ -167,20 +163,19 @@ class _PosScreenState extends State<PosScreen> {
   // CART RECONCILIATION
   // =========================================================
 
-  /// Reconcile the existing cart with the newly loaded catalogue.
+  /// Reconcile the cart against the latest catalogue.
   ///
-  /// - Remove products no longer available for sale.
-  /// - Remove products that have zero available stock.
-  /// - Reduce quantities that exceed current availability.
-  /// - Update the product snapshot so current prices are reflected.
+  /// - Remove products no longer active.
+  /// - Remove products with zero recorded stock.
+  /// - Reduce quantities that exceed availability.
+  /// - Update product details and prices.
   ///
-  /// The database remains the final authority when completing a sale.
+  /// PostgreSQL remains authoritative when a sale is submitted.
   _CartReconciliation _reconcileCart(
     List<PosCatalogItem> catalog,
   ) {
     final catalogById = <String, PosCatalogItem>{
-      for (final item in catalog)
-        item.product.id: item,
+      for (final item in catalog) item.product.id: item,
     };
 
     final reconciledCart = <String, PosCartLine>{};
@@ -191,7 +186,6 @@ class _PosScreenState extends State<PosScreen> {
       final oldLine = entry.value;
       final latestItem = catalogById[entry.key];
 
-      // The product is no longer in the active POS catalogue.
       if (latestItem == null) {
         wasAdjusted = true;
         continue;
@@ -199,19 +193,24 @@ class _PosScreenState extends State<PosScreen> {
 
       final availableQuantity = latestItem.availableQuantity;
 
-      // A product that has run out cannot remain in the cart.
       if (availableQuantity <= 0) {
         wasAdjusted = true;
         continue;
       }
 
-      // Never retain a cart quantity above recorded availability.
       final safeQuantity =
           oldLine.quantity > availableQuantity
               ? availableQuantity
               : oldLine.quantity;
 
       if (safeQuantity != oldLine.quantity) {
+        wasAdjusted = true;
+      }
+
+      if (oldLine.product.name != latestItem.product.name ||
+          oldLine.product.sellingPrice !=
+              latestItem.product.sellingPrice ||
+          oldLine.product.unit != latestItem.product.unit) {
         wasAdjusted = true;
       }
 
@@ -258,9 +257,9 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 
-  /// Money is stored in minor units.
+  /// Money uses minor units.
   ///
-  /// For example, SLE 65.00 is represented as 6500.
+  /// SLE 65.00 is represented as 6500.
   int get _cartTotal {
     return _cart.values.fold<int>(
       0,
@@ -358,16 +357,479 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   // =========================================================
-  // CHECKOUT
+  // CHECKOUT: OPEN THE CART
   // =========================================================
 
+  /// Opens cart review as a draggable bottom sheet.
+  ///
+  /// The user must confirm the cart before the payment dialog opens.
   Future<void> _openCheckout() async {
     if (_cart.isEmpty || _isProcessing) return;
 
-    // Take a snapshot for this checkout operation.
+    final proceedToPayment = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return _buildCartBottomSheet(sheetContext);
+      },
+    );
+
+    // Closing or dismissing the sheet does not clear the cart.
+    if (proceedToPayment != true ||
+        !mounted ||
+        _cart.isEmpty) {
+      return;
+    }
+
+    await _openPaymentAndCompleteSale();
+  }
+
+  // =========================================================
+  // CART BOTTOM SHEET
+  // =========================================================
+
+  Widget _buildCartBottomSheet(
+    BuildContext sheetContext,
+  ) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.78,
+      minChildSize: 0.45,
+      maxChildSize: 0.96,
+      expand: false,
+      builder: (context, scrollController) {
+        return StatefulBuilder(
+          builder: (context, sheetSetState) {
+            final lines =
+                _cart.values.toList(growable: false);
+
+            return Container(
+              decoration: const BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Drag handle.
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(
+                        top: 10,
+                        bottom: 6,
+                      ),
+                      width: 38,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.border,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                  ),
+
+                  // Cart header.
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      20,
+                      10,
+                      12,
+                      14,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppColors.brand.withValues(
+                              alpha: 0.09,
+                            ),
+                            borderRadius: BorderRadius.circular(13),
+                          ),
+                          child: const Icon(
+                            Icons.shopping_bag_outlined,
+                            color: AppColors.brand,
+                            size: 23,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Your Cart',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
+                                      color:
+                                          AppColors.textPrimary,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.3,
+                                    ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                '$_cartQuantity item(s) · '
+                                'Review before payment',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color:
+                                          AppColors.textSecondary,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Close cart',
+                          onPressed: () {
+                            Navigator.of(sheetContext).pop(false);
+                          },
+                          icon: const Icon(
+                            Icons.close_rounded,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const Divider(
+                    height: 1,
+                    color: AppColors.divider,
+                  ),
+
+                  // Cart items.
+                  Expanded(
+                    child: lines.isEmpty
+                        ? ListView(
+                            controller: scrollController,
+                            physics:
+                                const AlwaysScrollableScrollPhysics(),
+                            children: [
+                              const SizedBox(height: 48),
+                              const Icon(
+                                Icons.shopping_cart_outlined,
+                                size: 46,
+                                color: AppColors.textSecondary,
+                              ),
+                              const SizedBox(height: 14),
+                              Text(
+                                'Your cart is empty',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
+                              ),
+                              const SizedBox(height: 7),
+                              Text(
+                                'Add products from the catalogue '
+                                'to get started.',
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      color:
+                                          AppColors.textSecondary,
+                                    ),
+                              ),
+                            ],
+                          )
+                        : ListView.separated(
+                            controller: scrollController,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 8,
+                            ),
+                            itemCount: lines.length,
+                            separatorBuilder: (_, _) =>
+                                const Divider(
+                              height: 1,
+                              color: AppColors.divider,
+                            ),
+                            itemBuilder: (context, index) {
+                              final line = lines[index];
+
+                              return _buildCartSheetLine(
+                                line,
+                                sheetSetState,
+                              );
+                            },
+                          ),
+                  ),
+
+                  // Fixed total and continue button.
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(
+                      20,
+                      16,
+                      20,
+                      18,
+                    ),
+                    decoration: const BoxDecoration(
+                      color: AppColors.surface,
+                      border: Border(
+                        top: BorderSide(
+                          color: AppColors.divider,
+                        ),
+                      ),
+                    ),
+                    child: SafeArea(
+                      top: false,
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Total due',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(
+                                        color:
+                                            AppColors.textSecondary,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                              ),
+                              Text(
+                                'SLE ${formatSleMinor(_cartTotal)}',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineSmall
+                                    ?.copyWith(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.4,
+                                    ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            height: 50,
+                            child: FilledButton.icon(
+                              onPressed:
+                                  _cart.isEmpty || _isProcessing
+                                      ? null
+                                      : () {
+                                          Navigator.of(
+                                            sheetContext,
+                                          ).pop(true);
+                                        },
+                              icon: const Icon(
+                                Icons.arrow_forward_rounded,
+                              ),
+                              label: const Text(
+                                'Continue to payment',
+                              ),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.brand,
+                                foregroundColor:
+                                    AppColors.textOnBrand,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // =========================================================
+  // CART ITEM ROW
+  // =========================================================
+
+  Widget _buildCartSheetLine(
+    PosCartLine line,
+    StateSetter sheetSetState,
+  ) {
+    final product = line.product;
+
+    void changeQuantity(int difference) {
+      final currentLine = _cart[product.id];
+
+      if (currentLine == null) return;
+
+      _changeQuantity(currentLine, difference);
+
+      // Update the contents of the sheet as well.
+      sheetSetState(() {});
+    }
+
+    void removeProduct() {
+      if (_isProcessing) return;
+
+      setState(() {
+        _cart.remove(product.id);
+      });
+
+      sheetSetState(() {});
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      'SLE ${formatSleMinor(product.sellingPrice)} '
+                      'each · '
+                      '${_unitLabel(product.unit, line.quantity)}',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'SLE ${formatSleMinor(line.lineTotal)}',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.background,
+                  border: Border.all(
+                    color: AppColors.border,
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 3,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _QuantityButton(
+                      icon: Icons.remove_rounded,
+                      onPressed: _isProcessing
+                          ? null
+                          : () => changeQuantity(-1),
+                    ),
+                    SizedBox(
+                      width: 38,
+                      child: Text(
+                        '${line.quantity}',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleSmall
+                            ?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                    ),
+                    _QuantityButton(
+                      icon: Icons.add_rounded,
+                      onPressed: _isProcessing ||
+                              line.quantity >=
+                                  (_catalog
+                                          .where(
+                                            (item) =>
+                                                item.product.id ==
+                                                product.id,
+                                          )
+                                          .firstOrNull
+                                          ?.availableQuantity ??
+                                      0)
+                          ? null
+                          : () => changeQuantity(1),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed:
+                    _isProcessing ? null : removeProduct,
+                icon: const Icon(
+                  Icons.delete_outline_rounded,
+                  size: 18,
+                ),
+                label: const Text('Remove'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =========================================================
+  // CHECKOUT: PAYMENT AND SALE PROCESSING
+  // =========================================================
+
+  Future<void> _openPaymentAndCompleteSale() async {
+    if (_cart.isEmpty || _isProcessing) return;
+
+    // Capture a snapshot for this checkout operation.
     final lines = List<PosCartLine>.of(_cart.values);
     final total = _cartTotal;
 
+    // Payment remains a traditional popup.
     final paymentAmount = await showDialog<int>(
       context: context,
       builder: (_) => _CheckoutDialog(
@@ -389,18 +851,16 @@ class _PosScreenState extends State<PosScreen> {
         paymentAmount: paymentAmount,
       );
 
+      // Notify other screens as soon as persistence succeeds.
+      ShopFlowEvents.notifyDataChanged();
+
       if (!mounted) return;
 
       setState(() {
         _cart.clear();
       });
 
-      // Announce the successful sale only after the service confirms it.
-      //
-      // POS, Inventory, Products, and other subscribed screens
-      // can now retrieve their latest data.
-      ShopFlowEvents.notifyDataChanged();
-
+      // Keep the existing receipt popup.
       await _showReceipt(receipt);
     } catch (error, stackTrace) {
       debugPrint(
@@ -415,8 +875,7 @@ class _PosScreenState extends State<PosScreen> {
         isError: true,
       );
 
-      // Stock could have changed since the catalogue was loaded.
-      // Refresh after a failed checkout so the screen can recover.
+      // Refresh in case stock changed after the catalogue was loaded.
       unawaited(_refreshCatalog());
     } finally {
       if (mounted) {
@@ -645,9 +1104,6 @@ class _PosScreenState extends State<PosScreen> {
   // =========================================================
 
   /// Matches the Inventory and Products search fields.
-  ///
-  /// Includes a clear button that appears only when the user
-  /// has entered a search query.
   Widget _buildSearchField() {
     return SizedBox(
       height: 46,
@@ -897,7 +1353,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   // =========================================================
-  // CLEAN TWO-LINE POS PRODUCT ROW
+  // CLEAN POS PRODUCT ROW
   // =========================================================
 
   Widget _buildProductRow(
@@ -932,7 +1388,6 @@ class _PosScreenState extends State<PosScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // First line: product name and price.
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -964,10 +1419,7 @@ class _PosScreenState extends State<PosScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 5),
-
-            // Second line: current stock and cart controls.
             Row(
               children: [
                 Expanded(
@@ -999,16 +1451,13 @@ class _PosScreenState extends State<PosScreen> {
                     ],
                   ),
                 ),
-
                 const SizedBox(width: 8),
-
                 _buildQuantityControls(
                   item,
                   cartQuantity,
                 ),
               ],
             ),
-
             if (product.sku != null &&
                 product.sku!.isNotEmpty) ...[
               const SizedBox(height: 4),
@@ -1034,7 +1483,7 @@ class _PosScreenState extends State<PosScreen> {
   }
 
   // =========================================================
-  // CART QUANTITY CONTROLS
+  // PRODUCT QUANTITY CONTROLS
   // =========================================================
 
   Widget _buildQuantityControls(
@@ -1267,7 +1716,7 @@ class _ReceiptRow extends StatelessWidget {
 }
 
 // ===========================================================
-// CHECKOUT DIALOG
+// CHECKOUT PAYMENT DIALOG
 // ===========================================================
 
 class _CheckoutDialog extends StatefulWidget {
@@ -1441,7 +1890,7 @@ class _CheckoutDialogState extends State<_CheckoutDialog> {
 
             if (amount == null) return;
 
-            // Payment is returned in minor units.
+            // Return payment in minor currency units.
             Navigator.of(context).pop(amount);
           },
           child: const Text('Complete sale'),
