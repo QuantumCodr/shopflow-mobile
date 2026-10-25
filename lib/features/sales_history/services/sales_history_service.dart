@@ -11,9 +11,8 @@ class SalesHistoryServiceException implements Exception {
 }
 
 class SalesHistoryService {
-  SalesHistoryService({
-    SalesHistoryRepository? repository,
-  }) : _repository = repository ?? SalesHistoryRepository();
+  SalesHistoryService({SalesHistoryRepository? repository})
+    : _repository = repository ?? SalesHistoryRepository();
 
   final SalesHistoryRepository _repository;
 
@@ -21,9 +20,7 @@ class SalesHistoryService {
     try {
       final rows = await _repository.getRecentSales();
 
-      return rows
-          .map(SaleHistoryRecord.fromMap)
-          .toList(growable: false);
+      return rows.map(SaleHistoryRecord.fromMap).toList(growable: false);
     } on SalesHistoryRepositoryException catch (error) {
       throw SalesHistoryServiceException(error.message);
     } on FormatException {
@@ -33,19 +30,53 @@ class SalesHistoryService {
     }
   }
 
-  Future<List<SaleHistoryItem>> getSaleItems({
-    required String saleId,
+  Future<List<SaleHistoryRecord>> getRecentCompletedSales({
+    int limit = 5,
   }) async {
     try {
-      final rows = await _repository.getSaleItems(
-        saleId: saleId,
-      );
+      final rows = await _repository.getRecentCompletedSales(limit: limit);
 
-      return rows
-          .map(SaleHistoryItem.fromMap)
-          .toList(growable: false);
+      return rows.map(SaleHistoryRecord.fromMap).toList(growable: false);
     } on SalesHistoryRepositoryException catch (error) {
       throw SalesHistoryServiceException(error.message);
+    } on FormatException {
+      throw const SalesHistoryServiceException(
+        'A completed sale contains an invalid date or value.',
+      );
+    }
+  }
+
+  Future<List<SaleHistoryRecord>> getCompletedSalesBetween({
+    required DateTime startInclusive,
+    required DateTime endExclusive,
+  }) async {
+    try {
+      final rows = await _repository.getCompletedSalesBetween(
+        startInclusive: startInclusive,
+        endExclusive: endExclusive,
+      );
+
+      return rows.map(SaleHistoryRecord.fromMap).toList(growable: false);
+    } on SalesHistoryRepositoryException catch (error) {
+      throw SalesHistoryServiceException(error.message);
+    } on FormatException {
+      throw const SalesHistoryServiceException(
+        'A sale record contains an invalid date or value.',
+      );
+    }
+  }
+
+  Future<List<SaleHistoryItem>> getSaleItems({required String saleId}) async {
+    try {
+      final rows = await _repository.getSaleItems(saleId: saleId);
+
+      return rows.map(SaleHistoryItem.fromMap).toList(growable: false);
+    } on SalesHistoryRepositoryException catch (error) {
+      throw SalesHistoryServiceException(error.message);
+    } on FormatException {
+      throw const SalesHistoryServiceException(
+        'A sale item contains an invalid value.',
+      );
     }
   }
 }

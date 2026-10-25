@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shopflow_mobile/features/categories/presentation/categories_screen.dart';
+import 'package:shopflow_mobile/features/reports/presentation/reports_screen.dart';
 import 'package:shopflow_mobile/features/sales_history/presentation/sales_history_screen.dart';
 import 'package:shopflow_mobile/features/stock_movements/presentation/stock_movement_screen.dart';
 
@@ -134,12 +135,7 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
         icon: Icons.receipt_long_outlined,
       ), // 6: salesHistory
 
-      const _ModulePlaceholder(
-        title: 'Reports',
-        description:
-            'Explore reports about your business performance here.',
-        icon: Icons.bar_chart_rounded,
-      ), // 7: reports
+      const ReportsScreen(), // 7: reports
 
       const _ModulePlaceholder(
         title: 'Settings',

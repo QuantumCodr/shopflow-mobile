@@ -10,11 +10,15 @@ class SalesHistoryRepositoryException implements Exception {
 }
 
 class SalesHistoryRepository {
-  SalesHistoryRepository({
-    SupabaseClient? client,
-  }) : _client = client ?? Supabase.instance.client;
+  SalesHistoryRepository({SupabaseClient? client})
+    : _client = client ?? Supabase.instance.client;
 
   final SupabaseClient _client;
+
+  static const String _saleColumns =
+      'id, sale_number, status, subtotal_minor, '
+      'discount_minor, total_minor, amount_paid_minor, '
+      'change_minor, payment_method, created_at';
 
   Future<String> _requireActiveShopId() async {
     final user = _client.auth.currentUser;
@@ -48,6 +52,8 @@ class SalesHistoryRepository {
       }
 
       return shopId;
+    } on SalesHistoryRepositoryException {
+      rethrow;
     } on PostgrestException catch (error) {
       throw SalesHistoryRepositoryException(
         'Could not identify the active shop: ${error.message}',
@@ -55,37 +61,121 @@ class SalesHistoryRepository {
     }
   }
 
-  /// Retrieves the most recent 100 sales.
+  /// Retrieves the most recent sales, including their statuses.
   ///
-  /// The result is ordered from newest to oldest.
-  Future<List<Map<String, dynamic>>> getRecentSales({
-    int limit = 100,
-  }) async {
+  /// Results are ordered from newest to oldest.
+  Future<List<Map<String, dynamic>>> getRecentSales({int limit = 100}) async {
     final shopId = await _requireActiveShopId();
 
     try {
       final response = await _client
           .from('sales')
-          .select(
-            'id, sale_number, status, subtotal_minor, '
-            'discount_minor, total_minor, amount_paid_minor, '
-            'change_minor, payment_method, created_at',
-          )
+          .select(_saleColumns)
           .eq('shop_id', shopId)
-          .order(
-            'created_at',
-            ascending: false,
-          )
+          .order('created_at', ascending: false)
+          .order('id', ascending: false)
           .limit(limit);
 
       return response
-          .map<Map<String, dynamic>>(
-            (row) => Map<String, dynamic>.from(row),
-          )
+          .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
           .toList(growable: false);
     } on PostgrestException catch (error) {
       throw SalesHistoryRepositoryException(
         'Could not load sales history: ${error.message}',
+      );
+    }
+  }
+
+  /// Retrieves the most recent completed sales.
+  ///
+  /// Used by the dashboard's recent-sales section.
+  Future<List<Map<String, dynamic>>> getRecentCompletedSales({
+    int limit = 5,
+  }) async {
+    if (limit < 1 || limit > 100) {
+      throw const SalesHistoryRepositoryException(
+        'The sales limit must be between 1 and 100.',
+      );
+    }
+
+    final shopId = await _requireActiveShopId();
+
+    try {
+      final response = await _client
+          .from('sales')
+          .select(_saleColumns)
+          .eq('shop_id', shopId)
+          .eq('status', 'completed')
+          .order('created_at', ascending: false)
+          .order('id', ascending: false)
+          .limit(limit);
+
+      return response
+          .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
+          .toList(growable: false);
+    } on PostgrestException catch (error) {
+      throw SalesHistoryRepositoryException(
+        'Could not load recent completed sales: ${error.message}',
+      );
+    }
+  }
+
+  /// Retrieves every completed sale within a date range.
+  ///
+  /// The start is inclusive and the end is exclusive.
+  /// Pagination prevents the dashboard from relying on a single
+  /// limited response when calculating today's sales.
+  Future<List<Map<String, dynamic>>> getCompletedSalesBetween({
+    required DateTime startInclusive,
+    required DateTime endExclusive,
+  }) async {
+    if (!endExclusive.isAfter(startInclusive)) {
+      throw const SalesHistoryRepositoryException(
+        'The sales date range is invalid.',
+      );
+    }
+
+    final shopId = await _requireActiveShopId();
+
+    final startUtc = startInclusive.toUtc().toIso8601String();
+    final endUtc = endExclusive.toUtc().toIso8601String();
+
+    const pageSize = 500;
+    var offset = 0;
+
+    final sales = <Map<String, dynamic>>[];
+
+    try {
+      while (true) {
+        final response = await _client
+            .from('sales')
+            .select(_saleColumns)
+            .eq('shop_id', shopId)
+            .eq('status', 'completed')
+            .gte('created_at', startUtc)
+            .lt('created_at', endUtc)
+            .order('created_at', ascending: false)
+            .order('id', ascending: false)
+            .range(offset, offset + pageSize - 1);
+
+        final page = response
+            .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
+            .toList(growable: false);
+
+        sales.addAll(page);
+
+        if (page.length < pageSize) {
+          break;
+        }
+
+        offset += pageSize;
+      }
+
+      return sales;
+    } on PostgrestException catch (error) {
+      throw SalesHistoryRepositoryException(
+        'Could not load sales for the selected period: '
+        '${error.message}',
       );
     }
   }
@@ -110,9 +200,7 @@ class SalesHistoryRepository {
           .eq('sale_id', saleId);
 
       return response
-          .map<Map<String, dynamic>>(
-            (row) => Map<String, dynamic>.from(row),
-          )
+          .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
           .toList(growable: false);
     } on PostgrestException catch (error) {
       throw SalesHistoryRepositoryException(
