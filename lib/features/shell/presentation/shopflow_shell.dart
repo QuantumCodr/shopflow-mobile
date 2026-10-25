@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shopflow_mobile/features/sales_history/presentation/sales_history_screen.dart';
+import 'package:shopflow_mobile/features/stock_movements/presentation/stock_movement_screen.dart';
 
 import '../../../shared/theme/app_colors.dart';
 import '../../authentication/services/auth_service.dart';
@@ -127,14 +129,9 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
         icon: Icons.category_outlined,
       ), // 4: categories
 
-      const _ModulePlaceholder(
-        title: 'Stock Movements',
-        description:
-            'Track stock additions, reductions, and adjustments here.',
-        icon: Icons.swap_vert_rounded,
-      ), // 5: stockMovements
+      const StockMovementScreen(), // stockMovements: index 5
 
-      const _ModulePlaceholder(
+      const SalesHistoryScreen( 
         title: 'Sales History',
         description: 'Review your previous transactions here.',
         icon: Icons.receipt_long_outlined,
