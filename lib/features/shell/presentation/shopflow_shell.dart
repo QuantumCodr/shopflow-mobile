@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shopflow_mobile/features/categories/presentation/categories_screen.dart';
 import 'package:shopflow_mobile/features/sales_history/presentation/sales_history_screen.dart';
 import 'package:shopflow_mobile/features/stock_movements/presentation/stock_movement_screen.dart';
 
@@ -123,11 +124,7 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
       ProductsScreen(), // 2: products
       InventoryScreen(), // 3: inventory
 
-      const _ModulePlaceholder(
-        title: 'Categories',
-        description: 'Organise your products into categories here.',
-        icon: Icons.category_outlined,
-      ), // 4: categories
+      const CategoriesScreen(), // categories: index 4 // 4: categories
 
       const StockMovementScreen(), // stockMovements: index 5
 
