@@ -33,4 +33,26 @@ class StockMovementService {
       );
     }
   }
+
+  Future<List<StockMovement>> getMovementsBetween({
+    required DateTime startInclusive,
+    required DateTime endExclusive,
+  }) async {
+    try {
+      final rows = await _repository.getMovementsBetween(
+        startInclusive: startInclusive,
+        endExclusive: endExclusive,
+      );
+
+      return rows
+          .map(StockMovement.fromMap)
+          .toList(growable: false);
+    } on StockMovementRepositoryException catch (error) {
+      throw StockMovementServiceException(error.message);
+    } on FormatException {
+      throw const StockMovementServiceException(
+        'A stock movement contains an invalid value.',
+      );
+    }
+  }  
 }

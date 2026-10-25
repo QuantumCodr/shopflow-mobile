@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:shopflow_mobile/shared/time/shopflow_time.dart';
 
 import '../../../shared/state/shopflow_events.dart';
 import '../../../shared/theme/app_colors.dart';
@@ -47,7 +48,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   void dispose() {
     ShopFlowEvents.dataRevision.removeListener(_handleDataChanged);
-
     super.dispose();
   }
 
@@ -181,6 +181,30 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ' – ${_formatDate(lastIncludedDay)}';
   }
 
+  String _formatMovementType(String type) {
+    switch (type) {
+      case 'sale':
+        return 'POS sale';
+      case 'adjustment_in':
+        return 'Stock adjustment in';
+      case 'adjustment_out':
+        return 'Stock adjustment out';
+      case 'damaged':
+        return 'Damaged stock';
+      case 'returned':
+        return 'Returned stock';
+      default:
+        return type
+            .split('_')
+            .map(
+              (word) => word.isEmpty
+                  ? word
+                  : '${word[0].toUpperCase()}${word.substring(1)}',
+            )
+            .join(' ');
+    }
+  }
+
   // =========================================================
   // MAIN SCREEN
   // =========================================================
@@ -232,6 +256,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   const SizedBox(height: 32),
                   const _ReportsLoadingState(),
                 ] else if (report != null) ...[
+                  // SALES
                   const SizedBox(height: 24),
 
                   _buildSectionHeading(
@@ -254,6 +279,43 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                   _buildSalesTrend(report),
 
+                  // PRODUCTS
+                  const SizedBox(height: 28),
+
+                  _buildSectionHeading(
+                    'PRODUCT PERFORMANCE',
+                    subtitle: 'Best-selling products for this period',
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildProductPerformance(report),
+
+                  // CATEGORIES
+                  const SizedBox(height: 28),
+
+                  _buildSectionHeading(
+                    'CATEGORY PERFORMANCE',
+                    subtitle: 'Sales attributed to assigned categories',
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildCategoryPerformance(report),
+
+                  // PAYMENT METHODS
+                  const SizedBox(height: 28),
+
+                  _buildSectionHeading(
+                    'PAYMENT METHODS',
+                    subtitle: 'Completed sales by payment method',
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildPaymentMethodReport(report),
+
+                  // INVENTORY
                   const SizedBox(height: 28),
 
                   _buildSectionHeading(
@@ -269,12 +331,26 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
                   _buildSectionHeading(
                     'STOCK NEEDING ATTENTION',
-                    subtitle: 'Products at or below their reorder levels',
+                    subtitle:
+                        'Products at or below their reorder levels',
                   ),
 
                   const SizedBox(height: 12),
 
                   _buildStockAttention(report),
+
+                  // STOCK MOVEMENTS
+                  const SizedBox(height: 28),
+
+                  _buildSectionHeading(
+                    'STOCK MOVEMENTS',
+                    subtitle:
+                        'Inventory changes during the selected period',
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildStockMovementReport(report),
                 ],
 
                 if (_isLoading && report != null) ...[
@@ -480,6 +556,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   // =========================================================
 
   Widget _buildSalesTrend(ReportsSnapshot report) {
+    final bestDay = _highestSalesDay(report.dailySales);
+
     return _ReportPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -549,12 +627,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
               Expanded(
                 child: _TrendSummary(
                   label: 'Best sales day',
-                  value: _formatMoney(
-                    _highestSalesDay(report.dailySales).salesMinor,
-                  ),
-                  detail: _formatDate(
-                    _highestSalesDay(report.dailySales).date,
-                  ),
+                  value: _formatMoney(bestDay.salesMinor),
+                  detail: _formatDate(bestDay.date),
                 ),
               ),
               const SizedBox(width: 16),
@@ -588,7 +662,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   ) {
     if (points.isEmpty) {
       return DailySalesPoint(
-        date: DateTime.now(),
+        date: ShopFlowTime.nowUtc(),
         salesMinor: 0,
         transactionCount: 0,
       );
@@ -638,6 +712,359 @@ class _ReportsScreenState extends State<ReportsScreen> {
         );
       }).toList(growable: false),
     );
+  }
+
+  // =========================================================
+  // PRODUCT PERFORMANCE
+  // =========================================================
+
+  Widget _buildProductPerformance(ReportsSnapshot report) {
+    final products = report.productPerformance.take(10).toList();
+
+    return _ReportPanel(
+      child: products.isEmpty
+          ? const _ReportEmptyState(
+              icon: Icons.bar_chart_rounded,
+              title: 'No product sales yet',
+              message:
+                  'Products will appear here after completed sales.',
+            )
+          : Column(
+              children: [
+                for (var i = 0; i < products.length; i++) ...[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppColors.brand.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Text(
+                          '${i + 1}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelLarge
+                              ?.copyWith(
+                                color: AppColors.brand,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              products[i].productName,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${_formatQuantity(products[i].quantitySold)} '
+                              'sold · '
+                              '${products[i].transactionCount} '
+                              '${products[i].transactionCount == 1
+                                  ? 'transaction'
+                                  : 'transactions'}',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Estimated gross profit: '
+                              '${_formatMoney(products[i].grossProfitMinor)}',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: products[i].grossProfitMinor < 0
+                                        ? AppColors.error
+                                        : AppColors.success,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Flexible(
+                        child: Text(
+                          _formatMoney(products[i].revenueMinor),
+                          textAlign: TextAlign.end,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (i < products.length - 1)
+                    const Divider(
+                      height: 24,
+                      color: AppColors.divider,
+                    ),
+                ],
+                if (report.productPerformance.length > products.length) ...[
+                  const Divider(
+                    height: 24,
+                    color: AppColors.divider,
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '${report.productPerformance.length - products.length} '
+                      'additional products recorded sales.',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                const _InlineNotice(
+                  message:
+                      'Gross profit is estimated as sales revenue minus '
+                      'the recorded cost of goods sold. Operating expenses '
+                      'are not included.',
+                ),
+              ],
+            ),
+    );
+  }
+
+  // =========================================================
+  // CATEGORY PERFORMANCE
+  // =========================================================
+
+  Widget _buildCategoryPerformance(ReportsSnapshot report) {
+    final categories = report.categoryPerformance;
+
+    return _ReportPanel(
+      child: categories.isEmpty
+          ? const _ReportEmptyState(
+              icon: Icons.category_outlined,
+              title: 'No categories available',
+              message:
+                  'Create product categories to organise performance reporting.',
+            )
+          : Column(
+              children: [
+                for (var i = 0; i < categories.length; i++) ...[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: AppColors.brand.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.category_outlined,
+                          color: AppColors.brand,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              categories[i].categoryName,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${categories[i].assignedProductCount} '
+                              'assigned products · '
+                              '${_formatQuantity(categories[i].quantitySold)} '
+                              'units sold',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          _formatMoney(categories[i].revenueMinor),
+                          textAlign: TextAlign.end,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (i < categories.length - 1)
+                    const Divider(
+                      height: 24,
+                      color: AppColors.divider,
+                    ),
+                ],
+                const SizedBox(height: 12),
+                const _InlineNotice(
+                  message:
+                      'Category totals can overlap when a product belongs '
+                      'to multiple categories. Do not add these figures '
+                      'to calculate total shop sales.',
+                ),
+              ],
+            ),
+    );
+  }
+
+  // =========================================================
+  // PAYMENT METHODS
+  // =========================================================
+
+  Widget _buildPaymentMethodReport(ReportsSnapshot report) {
+    final paymentMethods = report.paymentMethods;
+
+    return _ReportPanel(
+      child: paymentMethods.isEmpty
+          ? const _ReportEmptyState(
+              icon: Icons.payments_outlined,
+              title: 'No payment data yet',
+              message:
+                  'Payment method totals appear when completed sales '
+                  'are recorded.',
+            )
+          : Column(
+              children: [
+                for (var i = 0; i < paymentMethods.length; i++) ...[
+                  Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: AppColors.brand.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          _paymentMethodIcon(
+                            paymentMethods[i].paymentMethod,
+                          ),
+                          color: AppColors.brand,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              paymentMethods[i].paymentMethod,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: AppColors.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${paymentMethods[i].transactionCount} '
+                              '${paymentMethods[i].transactionCount == 1
+                                  ? 'transaction'
+                                  : 'transactions'}',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatMoney(paymentMethods[i].totalMinor),
+                        textAlign: TextAlign.end,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyMedium
+                            ?.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                    ],
+                  ),
+                  if (i < paymentMethods.length - 1)
+                    const Divider(
+                      height: 24,
+                      color: AppColors.divider,
+                    ),
+                ],
+              ],
+            ),
+    );
+  }
+
+  IconData _paymentMethodIcon(String method) {
+    switch (method.toLowerCase()) {
+      case 'cash':
+        return Icons.payments_outlined;
+      case 'mobile money':
+      case 'mobile_money':
+        return Icons.phone_android_rounded;
+      case 'card':
+        return Icons.credit_card_outlined;
+      default:
+        return Icons.account_balance_wallet_outlined;
+    }
   }
 
   // =========================================================
@@ -750,6 +1177,120 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ],
               ],
             ),
+    );
+  }
+
+  // =========================================================
+  // STOCK MOVEMENT REPORT
+  // =========================================================
+
+  Widget _buildStockMovementReport(ReportsSnapshot report) {
+    final movements = report.stockMovements.take(10).toList();
+
+    return _ReportPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _TrendSummary(
+                  label: 'Stock added',
+                  value: _formatQuantity(report.stockInQuantity),
+                  detail: 'Positive movements',
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _TrendSummary(
+                  label: 'Stock removed',
+                  value: _formatQuantity(report.stockOutQuantity),
+                  detail: 'Negative movements',
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 18),
+
+          _TrendSummary(
+            label: 'Stock sold through POS',
+            value: _formatQuantity(report.stockSoldQuantity),
+            detail: 'Quantity deducted by completed sales',
+          ),
+
+          const SizedBox(height: 18),
+
+          const Divider(
+            height: 1,
+            color: AppColors.divider,
+          ),
+
+          const SizedBox(height: 16),
+
+          Text(
+            'Movements in this period',
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+
+          const SizedBox(height: 16),
+
+          if (movements.isEmpty)
+            const _ReportEmptyState(
+              icon: Icons.swap_vert_rounded,
+              title: 'No stock movements',
+              message:
+                  'Receipts, adjustments, returns, damaged goods '
+                  'and POS sales will appear here.',
+            )
+          else
+            ...[
+              for (var i = 0; i < movements.length; i++) ...[
+                _StockMovementRow(
+                  productName: movements[i].productName,
+                  productUnit: movements[i].productUnit,
+                  movementType: movements[i].movementType,
+                  quantityDelta: movements[i].quantityDelta,
+                  createdAt: movements[i].createdAt,
+                  reason: movements[i].reason,
+                  formatDate: _formatDate,
+                  formatQuantity: _formatQuantity,
+                  formatMovementType: _formatMovementType,
+                ),
+                if (i < movements.length - 1)
+                  const Divider(
+                    height: 24,
+                    color: AppColors.divider,
+                  ),
+              ],
+              if (report.stockMovements.length > movements.length) ...[
+                const Divider(
+                  height: 24,
+                  color: AppColors.divider,
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '${report.stockMovements.length - movements.length} '
+                    'additional movements occurred during this period.',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                  ),
+                ),
+              ],
+            ],
+        ],
+      ),
     );
   }
 
@@ -1065,6 +1606,136 @@ class _StockAttentionRow extends StatelessWidget {
 }
 
 // ===========================================================
+// STOCK MOVEMENT ROW
+// ===========================================================
+
+class _StockMovementRow extends StatelessWidget {
+  const _StockMovementRow({
+    required this.productName,
+    required this.productUnit,
+    required this.movementType,
+    required this.quantityDelta,
+    required this.createdAt,
+    required this.formatDate,
+    required this.formatQuantity,
+    required this.formatMovementType,
+    this.reason,
+  });
+
+  final String productName;
+  final String productUnit;
+  final String movementType;
+  final double quantityDelta;
+  final DateTime createdAt;
+  final String? reason;
+
+  final String Function(DateTime) formatDate;
+  final String Function(double) formatQuantity;
+  final String Function(String) formatMovementType;
+
+  @override
+  Widget build(BuildContext context) {
+    final isIncrease = quantityDelta > 0;
+    final accent = isIncrease
+        ? AppColors.success
+        : quantityDelta < 0
+            ? AppColors.error
+            : AppColors.textSecondary;
+
+    final icon = isIncrease
+        ? Icons.south_west_rounded
+        : quantityDelta < 0
+            ? Icons.north_east_rounded
+            : Icons.remove_rounded;
+
+    final quantityLabel =
+        '${quantityDelta > 0 ? '+' : ''}'
+        '${formatQuantity(quantityDelta)}'
+        '${productUnit.isNotEmpty ? ' $productUnit' : ''}';
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.09),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Icon(
+            icon,
+            size: 18,
+            color: accent,
+          ),
+        ),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                productName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${formatMovementType(movementType)}'
+                ' · ${formatDate(ShopFlowTime.toBusinessTime(createdAt))}',
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+              ),
+              if (reason != null && reason!.trim().isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  reason!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall
+                      ?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Text(
+            quantityLabel,
+            textAlign: TextAlign.end,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context)
+                .textTheme
+                .labelMedium
+                ?.copyWith(
+                  color: accent,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ===========================================================
 // SALES TREND CHART
 // ===========================================================
 
@@ -1091,7 +1762,6 @@ class _SalesTrendPainter extends CustomPainter {
       ..color = AppColors.divider
       ..strokeWidth = 1;
 
-    // Four horizontal grid lines.
     for (var i = 0; i < 4; i++) {
       final y = topPadding + plotHeight * (i / 3);
 
@@ -1268,6 +1938,7 @@ class _InlineNotice extends StatelessWidget {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(
             Icons.info_outline_rounded,

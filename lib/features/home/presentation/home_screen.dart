@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shopflow_mobile/shared/time/shopflow_time.dart';
 
 import '../../../shared/state/shopflow_events.dart';
 import '../../../shared/theme/app_colors.dart';
@@ -89,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _errorMessage = error is HomeDashboardServiceException
             ? error.message
             : 'Could not load the dashboard. '
-                'Please check your connection and try again.';
+                  'Please check your connection and try again.';
       });
     }
   }
@@ -125,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _formatSaleDate(DateTime date) {
-    final localDate = date.toLocal();
+    final localDate = ShopFlowTime.toBusinessTime(date);
 
     const months = [
       'Jan',
@@ -341,54 +342,45 @@ class _HomeScreenState extends State<HomeScreen> {
           child: _isLoading && dashboard == null
               ? const _PanelLoadingState()
               : dashboard == null
-                  ? const _PanelEmptyState(
-                      icon: Icons.cloud_off_outlined,
-                      title: 'Stock unavailable',
-                      message:
-                          'Refresh the dashboard to retrieve inventory.',
-                    )
-                  : items.isEmpty
-                      ? const _PanelEmptyState(
-                          icon: Icons.check_circle_outline_rounded,
-                          title: 'Stock looks good',
-                          message:
-                              'No active products are at or below '
-                              'their reorder thresholds.',
-                        )
-                      : Column(
-                          children: [
-                            for (var i = 0; i < items.length && i < 5; i++) ...[
-                              _LowStockRow(
-                                name: items[i].name,
-                                quantity: items[i].quantity,
-                                unit: items[i].unit,
-                                isOutOfStock: items[i].isOutOfStock,
-                                formatQuantity: _formatQuantity,
-                              ),
-                              if (i < items.length - 1 && i < 4)
-                                const Divider(
-                                  height: 20,
-                                  color: AppColors.divider,
-                                ),
-                            ],
-                            if (items.length > 5) ...[
-                              const Divider(
-                                height: 20,
-                                color: AppColors.divider,
-                              ),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  '${items.length - 5} more products need attention.',
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: AppColors.textSecondary,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ],
+              ? const _PanelEmptyState(
+                  icon: Icons.cloud_off_outlined,
+                  title: 'Stock unavailable',
+                  message: 'Refresh the dashboard to retrieve inventory.',
+                )
+              : items.isEmpty
+              ? const _PanelEmptyState(
+                  icon: Icons.check_circle_outline_rounded,
+                  title: 'Stock looks good',
+                  message:
+                      'No active products are at or below '
+                      'their reorder thresholds.',
+                )
+              : Column(
+                  children: [
+                    for (var i = 0; i < items.length && i < 5; i++) ...[
+                      _LowStockRow(
+                        name: items[i].name,
+                        quantity: items[i].quantity,
+                        unit: items[i].unit,
+                        isOutOfStock: items[i].isOutOfStock,
+                        formatQuantity: _formatQuantity,
+                      ),
+                      if (i < items.length - 1 && i < 4)
+                        const Divider(height: 20, color: AppColors.divider),
+                    ],
+                    if (items.length > 5) ...[
+                      const Divider(height: 20, color: AppColors.divider),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          '${items.length - 5} more products need attention.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppColors.textSecondary),
                         ),
+                      ),
+                    ],
+                  ],
+                ),
         ),
       ],
     );
@@ -413,35 +405,32 @@ class _HomeScreenState extends State<HomeScreen> {
           child: _isLoading && dashboard == null
               ? const _PanelLoadingState()
               : dashboard == null
-                  ? const _PanelEmptyState(
-                      icon: Icons.cloud_off_outlined,
-                      title: 'Sales unavailable',
-                      message: 'Refresh the dashboard to retrieve sales.',
-                    )
-                  : sales.isEmpty
-                      ? const _PanelEmptyState(
-                          icon: Icons.receipt_long_outlined,
-                          title: 'No sales yet',
-                          message:
-                              'Completed transactions will appear here '
-                              'when you start selling.',
-                        )
-                      : Column(
-                          children: [
-                            for (var i = 0; i < sales.length; i++) ...[
-                              _RecentSaleRow(
-                                saleNumber: sales[i].saleNumber,
-                                date: _formatSaleDate(sales[i].createdAt),
-                                amount: _formatMoney(sales[i].totalMinor),
-                              ),
-                              if (i < sales.length - 1)
-                                const Divider(
-                                  height: 20,
-                                  color: AppColors.divider,
-                                ),
-                            ],
-                          ],
-                        ),
+              ? const _PanelEmptyState(
+                  icon: Icons.cloud_off_outlined,
+                  title: 'Sales unavailable',
+                  message: 'Refresh the dashboard to retrieve sales.',
+                )
+              : sales.isEmpty
+              ? const _PanelEmptyState(
+                  icon: Icons.receipt_long_outlined,
+                  title: 'No sales yet',
+                  message:
+                      'Completed transactions will appear here '
+                      'when you start selling.',
+                )
+              : Column(
+                  children: [
+                    for (var i = 0; i < sales.length; i++) ...[
+                      _RecentSaleRow(
+                        saleNumber: sales[i].saleNumber,
+                        date: _formatSaleDate(sales[i].createdAt),
+                        amount: _formatMoney(sales[i].totalMinor),
+                      ),
+                      if (i < sales.length - 1)
+                        const Divider(height: 20, color: AppColors.divider),
+                    ],
+                  ],
+                ),
         ),
       ],
     );
@@ -625,10 +614,8 @@ class _LowStockRow extends StatelessWidget {
               const SizedBox(height: 3),
               Text(
                 isOutOfStock ? 'Out of stock' : 'Low stock',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: statusColor,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(context).textTheme.labelSmall
+                    ?.copyWith(color: statusColor, fontWeight: FontWeight.w700),
               ),
             ],
           ),

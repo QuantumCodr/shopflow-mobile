@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:shopflow_mobile/features/sales_history/data/sales_history_repository.dart';
+import 'package:shopflow_mobile/shared/time/shopflow_time.dart';
 
 import '../../../shared/formatters/sle_money.dart';
 import '../../../shared/state/shopflow_events.dart';
@@ -582,8 +583,8 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   // =========================================================
 
   String _formatDateTime(DateTime value) {
-    final date = value.toLocal();
-    final now = DateTime.now();
+    final date = ShopFlowTime.toBusinessTime(value);
+    final now = ShopFlowTime.nowUtc();
 
     final today = DateTime(now.year, now.month, now.day);
     final saleDay = DateTime(date.year, date.month, date.day);

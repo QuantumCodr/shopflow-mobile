@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shopflow_mobile/shared/time/shopflow_time.dart';
 
 import '../../../shared/state/shopflow_events.dart';
 import '../../../shared/theme/app_colors.dart';
@@ -573,8 +574,8 @@ class _StockMovementScreenState
   }
 
   String _formatDateTime(DateTime value) {
-    final date = value.toLocal();
-    final now = DateTime.now();
+    final date = ShopFlowTime.toBusinessTime(value);
+    final now = ShopFlowTime.nowUtc();
 
     final today = DateTime(
       now.year,

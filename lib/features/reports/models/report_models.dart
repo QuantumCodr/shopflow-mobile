@@ -27,12 +27,89 @@ class DailySalesPoint {
   });
 
   final DateTime date;
-
-  /// Total completed sales for this calendar day, in minor units.
   final int salesMinor;
-
-  /// Number of completed transactions for this calendar day.
   final int transactionCount;
+}
+
+class ProductPerformancePoint {
+  const ProductPerformancePoint({
+    required this.productId,
+    required this.productName,
+    required this.quantitySold,
+    required this.revenueMinor,
+    required this.costMinor,
+    required this.grossProfitMinor,
+    required this.transactionCount,
+  });
+
+  final String productId;
+  final String productName;
+
+  /// Quantity sold during the selected reporting period.
+  final double quantitySold;
+
+  /// Sales revenue in minor currency units.
+  final int revenueMinor;
+
+  /// Estimated cost of goods sold in minor currency units.
+  final int costMinor;
+
+  /// Revenue minus estimated cost of goods sold.
+  final int grossProfitMinor;
+
+  /// Number of distinct transactions containing this product.
+  final int transactionCount;
+}
+
+class CategoryPerformancePoint {
+  const CategoryPerformancePoint({
+    required this.categoryId,
+    required this.categoryName,
+    required this.assignedProductCount,
+    required this.quantitySold,
+    required this.revenueMinor,
+  });
+
+  final String categoryId;
+  final String categoryName;
+  final int assignedProductCount;
+  final double quantitySold;
+  final int revenueMinor;
+}
+
+class PaymentMethodPoint {
+  const PaymentMethodPoint({
+    required this.paymentMethod,
+    required this.transactionCount,
+    required this.totalMinor,
+  });
+
+  final String paymentMethod;
+  final int transactionCount;
+  final int totalMinor;
+}
+
+class StockMovementReportEntry {
+  const StockMovementReportEntry({
+    required this.id,
+    required this.productName,
+    required this.productUnit,
+    required this.movementType,
+    required this.quantityDelta,
+    required this.createdAt,
+    this.reason,
+  });
+
+  final String id;
+  final String productName;
+  final String productUnit;
+  final String movementType;
+
+  /// Positive means stock increased; negative means stock decreased.
+  final double quantityDelta;
+
+  final DateTime createdAt;
+  final String? reason;
 }
 
 class ReportsSnapshot {
@@ -48,37 +125,41 @@ class ReportsSnapshot {
     required this.lowStockCount,
     required this.outOfStockCount,
     required this.stockAttentionItems,
+    this.productPerformance = const [],
+    this.categoryPerformance = const [],
+    this.paymentMethods = const [],
+    this.stockMovements = const [],
+    this.stockInQuantity = 0,
+    this.stockOutQuantity = 0,
+    this.stockSoldQuantity = 0,
   });
 
   final ReportsPeriod period;
-
-  /// First included calendar day.
   final DateTime startInclusive;
-
-  /// Exclusive end boundary used for database queries.
   final DateTime endExclusive;
 
-  /// Total of completed sales in the selected period.
   final int totalSalesMinor;
-
-  /// Number of completed sales in the selected period.
   final int transactionCount;
-
-  /// Average completed sale value, in minor units.
   final int averageTransactionMinor;
 
-  /// Daily breakdown for the selected period.
   final List<DailySalesPoint> dailySales;
 
-  /// Number of active products returned by InventoryService.
   final int activeProductCount;
-
-  /// Active products with positive stock at or below the reorder level.
   final int lowStockCount;
-
-  /// Active products with zero or negative stock.
   final int outOfStockCount;
-
-  /// Products requiring attention, with out-of-stock items first.
   final List<InventoryItem> stockAttentionItems;
+
+  final List<ProductPerformancePoint> productPerformance;
+  final List<CategoryPerformancePoint> categoryPerformance;
+  final List<PaymentMethodPoint> paymentMethods;
+  final List<StockMovementReportEntry> stockMovements;
+
+  /// Total positive stock movement during the selected period.
+  final double stockInQuantity;
+
+  /// Total quantity removed from inventory during the selected period.
+  final double stockOutQuantity;
+
+  /// Subset of stock-out quantity caused by completed POS sales.
+  final double stockSoldQuantity;
 }
