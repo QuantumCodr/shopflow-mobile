@@ -1,20 +1,20 @@
 # ShopFlow
 
-**ShopFlow** is a Flutter application for managing the everyday activities of a small retail shop. It brings the product catalogue, stock, checkout, sales records and business reports into one workspace.
+**ShopFlow** is a Flutter application for managing the everyday activities of a small retail shop. It brings the product catalogue, inventory, checkout, sales records and business reports into one workspace.
 
-> **Project stage:** Active development. The application should not yet be treated as production-ready. Some database operations required by the current Flutter code still need to be aligned with the checked-in SQL bootstrap and verified against a fresh Supabase project.
+> **Project stage:** Active development. ShopFlow is not yet production-ready. Its core application structure and V1 database definition are in place, but database installation, authentication, business workflows and security still require end-to-end verification.
 
-## What ShopFlow includes
+## What ShopFlow Includes
 
 - Account registration, sign-in and password-management screens.
 - First-time shop setup and shop settings.
 - Product catalogue and category management.
 - Inventory balances, stock receiving and stock adjustments.
-- Point of Sale (POS) cart and checkout interface.
+- Point of Sale (POS) cart and checkout.
 - Sales history and business reports.
 - A home dashboard with daily sales, transaction count, low-stock items and recent sales.
 
-The screens and service/repository code for these areas are present in the application. Their end-to-end availability depends on the Supabase schema, policies and database functions being correctly installed.
+The application contains screens, services and repositories for these areas. Complete operation depends on correctly configured Supabase authentication, database schema, security policies and functions.
 
 ## Technology
 
@@ -24,20 +24,20 @@ The screens and service/repository code for these areas are present in the appli
 | Authentication | Supabase Auth |
 | Main database | Supabase PostgreSQL |
 | Configuration | `flutter_dotenv` and a local `.env` file |
-| State refresh between feature screens | `ShopFlowEvents` |
+| Shared feature refresh | `ShopFlowEvents` |
 
-PostgreSQL is the authoritative data store. The current source does not contain a completed SQLite cache or offline transaction-sync implementation. Do not assume ShopFlow can safely complete sales while disconnected.
+PostgreSQL is the authoritative data store. The current source does not contain a completed SQLite cache or offline transaction-sync implementation. ShopFlow cannot safely complete sales or inventory transactions while disconnected.
 
-## Getting started
+## Getting Started
 
 ### Requirements
 
 - Flutter SDK and Dart SDK compatible with the constraints in `pubspec.yaml`.
-- Android Studio or another Android SDK installation for Android builds.
-- A Supabase project with the required database schema, Row Level Security policies and database functions.
+- Android Studio or another Android SDK installation for Android development.
+- A Supabase project.
 - Git.
 
-### Local setup
+### Local Setup
 
 1. Clone the repository:
 
@@ -46,7 +46,7 @@ PostgreSQL is the authoritative data store. The current source does not contain 
    cd shopflow-mobile
    ```
 
-2. Install the Dart and Flutter packages:
+2. Install the project dependencies:
 
    ```powershell
    flutter pub get
@@ -58,55 +58,90 @@ PostgreSQL is the authoritative data store. The current source does not contain 
    Copy-Item .env.example .env
    ```
 
-4. Open `.env` and provide the Supabase project URL and publishable key:
+4. Open `.env` and provide your Supabase project URL and publishable key:
 
    ```dotenv
    SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
    SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
    ```
 
-5. Configure the Supabase database using the instructions in [Database and security](docs/DATABASE_AND_SECURITY.md). The SQL bootstrap is intended for an empty project only. Do not run it as an update against a database containing data.
+5. Configure the Supabase database using [Database and Security](docs/DATABASE_AND_SECURITY.md).
 
-6. Check the project and run the application:
+   The canonical `SHOPFLOW_DATABASE.sql` file is intended for a new or empty Supabase project only. Do not run it over an existing database containing data.
+
+6. Check and run the application:
 
    ```powershell
    dart format lib
-   dart analyze
+   flutter analyze
+   flutter test
    flutter run
    ```
 
-For a browser test using a stable local origin, run:
+### Browser Development
+
+For browser testing with a stable local origin, run:
 
 ```powershell
 flutter run -d web-server --web-hostname localhost --web-port 7357
 ```
 
-Then open `http://localhost:7357` in the browser profile you intend to use for the test. Keep the hostname and port unchanged during a PKCE authentication flow.
+Then open:
+
+`http://localhost:7357`
+
+Keep the hostname, port and browser profile unchanged during a PKCE authentication flow. See the [Developer Setup Guide](docs/DEVELOPER_GUIDE.md) for authentication redirect configuration.
+
+## Database
+
+`SHOPFLOW_DATABASE.sql` is the single canonical V1 fresh-install database definition.
+
+It includes the application schema, indexes, Row Level Security policies, authentication and inventory triggers, and the three business functions used by the current Flutter repositories:
+
+- `receive_stock` — receives stock and records the movement.
+- `adjust_stock` — adjusts inventory and records the movement.
+- `complete_sale` — validates and records a sale, updates inventory and records sale movements.
+
+The SQL definition has been inspected, but a successful fresh installation and end-to-end test against a separate Supabase project are still required.
+
+Do not execute the older `shopflow_supabase_fresh_install.sql` as an alternative setup script. Existing databases should be updated through reviewed incremental migrations.
 
 ## Documentation
 
 Start with the document that matches your role:
 
-- [Shop user guide](docs/USER_GUIDE.md) — everyday shop workflows.
-- [Developer setup guide](docs/DEVELOPER_GUIDE.md) — local setup, configuration and commands.
-- [Architecture overview](docs/ARCHITECTURE.md) — application structure and data flow.
-- [Database and security](docs/DATABASE_AND_SECURITY.md) — tables, money representation, RLS and required database functions.
-- [Contributing guide](docs/CONTRIBUTING.md) — code and documentation practices.
-- [Project status and known limitations](docs/PROJECT_STATUS.md) — verified capabilities, open work and release blockers.
+- [Shop User Guide](docs/USER_GUIDE.md) — everyday shop workflows.
+- [Developer Setup Guide](docs/DEVELOPER_GUIDE.md) — local setup, configuration and commands.
+- [Architecture Overview](docs/ARCHITECTURE.md) — application structure and data flow.
+- [Database and Security](docs/DATABASE_AND_SECURITY.md) — tables, money representation, RLS and database functions.
+- [Contributing Guide](docs/CONTRIBUTING.md) — code and documentation practices.
+- [Project Status](docs/PROJECT_STATUS.md) — implemented features, known limitations and remaining work.
 
 The documentation index is available at [docs/README.md](docs/README.md).
 
-## Security basics
+## Security Basics
 
 - Never commit `.env`, passwords, access tokens, customer data or other secrets.
-- The Flutter client must use the Supabase publishable key, not a service-role key.
-- Keep authorization decisions in PostgreSQL Row Level Security policies and carefully reviewed database functions. Hiding a button in the UI is not access control.
-- Do not run fresh-install SQL on an existing production database. Use reviewed, incremental migrations for schema changes.
+- The Flutter client must use the Supabase publishable key, never a service-role key.
+- Enforce authorization through PostgreSQL Row Level Security policies and carefully reviewed database functions.
+- Do not rely on hiding a button in the interface as a security measure.
+- Do not run fresh-install SQL against an existing production database. Use reviewed, incremental migrations for schema changes.
 
-## Current limitations
+## Current Limitations
 
-Read [Project status](docs/PROJECT_STATUS.md) before setting up a new database or relying on POS and stock-adjustment operations. In particular, the current Flutter repositories call `adjust_stock` and `complete_sale`, but those functions are not present in the checked-in `SHOPFLOW_DATABASE.sql` bootstrap.
+- A complete SQLite cache and offline transaction synchronization are not implemented.
+- Fractional inventory quantities are supported, but POS currently accepts whole-number quantities only.
+- Database installation and business workflows still require end-to-end verification.
+- Password recovery requires testing on both web and Android.
+- Automated test coverage remains incomplete.
+- V1 supports one shop per account owner; employee roles and multi-shop access are not implemented.
+
+See [Project Status](docs/PROJECT_STATUS.md) for the current implementation and verification checklist.
 
 ## License
 
-No license file is currently included in the repository. Until a license is selected and added, do not assume that the public repository grants permission to reuse, redistribute or modify its code.
+ShopFlow is licensed under the **Apache License, Version 2.0**.
+
+You may use, modify and distribute the project under the terms and conditions of this licence. See the [`LICENSE`](LICENSE) file for the complete licence text.
+
+SPDX-License-Identifier: Apache-2.0
