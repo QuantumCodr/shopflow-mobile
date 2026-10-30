@@ -92,4 +92,10 @@ class AuthRepository {
     );
   }
 
+  Future<AuthSessionUrlResponse> handleAuthCallback(
+    Uri callbackUri,
+  ) {
+    return _client.auth.getSessionFromUrl(callbackUri);
+  }  
+
 }

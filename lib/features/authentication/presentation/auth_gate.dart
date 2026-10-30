@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -32,24 +33,112 @@ class _AuthGateState extends State<AuthGate> {
   bool? _hasShop;
   String? _errorMessage;
 
-  // True while the user is completing a password-reset flow.
   bool _isPasswordRecovery = false;
+  bool _isHandlingWebCallback = false;
 
-  // Prevents stale shop-check requests from overwriting newer state.
+  // Prevents stale shop checks from overwriting newer state.
   int _checkVersion = 0;
 
   @override
   void initState() {
     super.initState();
 
-    // Listen for Supabase authentication events.
-    _authSubscription =
-        widget.authService.authStateChanges.listen(
+    // Listen before processing any authentication callback.
+    _authSubscription = widget.authService.authStateChanges.listen(
       _handleAuthState,
     );
 
-    // Check shop status for an existing authenticated session.
-    _checkShop();
+    if (kIsWeb) {
+      // Web callbacks must be processed manually because
+      // detectSessionInUri is disabled in main.dart for web.
+      unawaited(_handleWebCallbackOrCheckShop());
+    } else {
+      // Android callbacks are handled by Supabase automatically.
+      _checkShop();
+    }
+  }
+
+  // =========================================================
+  // WEB CALLBACK DETECTION
+  // =========================================================
+
+  bool _containsAuthCallback(Uri uri) {
+    return uri.queryParameters.containsKey('code') ||
+        uri.queryParameters.containsKey('error') ||
+        uri.queryParameters.containsKey('error_code') ||
+        uri.queryParameters.containsKey('error_description');
+  }
+
+  Future<void> _handleWebCallbackOrCheckShop() async {
+    final uri = Uri.base;
+
+    // Normal browser launch: there is no authentication callback.
+    if (!_containsAuthCallback(uri)) {
+      await _checkShop();
+      return;
+    }
+
+    setState(() {
+      _isHandlingWebCallback = true;
+      _checkingShop = true;
+      _hasShop = null;
+      _errorMessage = null;
+    });
+
+    try {
+      // Exchange the recovery URL for a Supabase session.
+      final response = await widget.authService.handleAuthCallback(uri);
+
+      if (!mounted) return;
+
+      final isRecovery =
+          response.redirectType == AuthChangeEvent.passwordRecovery.name;
+
+      setState(() {
+        _isHandlingWebCallback = false;
+        _isPasswordRecovery = isRecovery;
+        _checkingShop = false;
+        _hasShop = null;
+        _errorMessage = null;
+      });
+
+      // Other authentication callbacks continue to normal shop checks.
+      if (!isRecovery) {
+        await _checkShop();
+      }
+    } on AuthException catch (error, stackTrace) {
+      debugPrint(
+        'SHOPFLOW: Web authentication callback failed: '
+        '${error.message}\n$stackTrace',
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _isHandlingWebCallback = false;
+        _checkingShop = false;
+        _hasShop = null;
+        _errorMessage =
+            'This authentication link is invalid or expired. '
+            'Please request a new password-reset email.';
+      });
+    } catch (error, stackTrace) {
+      debugPrint(
+        'SHOPFLOW: Unexpected web callback error: '
+        '$error\n$stackTrace',
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _isHandlingWebCallback = false;
+        _checkingShop = false;
+        _hasShop = null;
+        _errorMessage =
+            'We could not complete password recovery. '
+            'Please request a new reset email.';
+      });
+    }
   }
 
   // =========================================================
@@ -67,11 +156,6 @@ class _AuthGateState extends State<AuthGate> {
     if (!mounted) return;
 
     // PASSWORD RECOVERY
-    //
-    // Supabase emits this event when the user enters the password
-    // recovery flow through a valid recovery link.
-    //
-    // Do not perform the regular shop check during recovery.
     if (state.event == AuthChangeEvent.passwordRecovery &&
         state.session != null) {
       _checkVersion++;
@@ -87,9 +171,6 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     // SESSION ENDED
-    //
-    // This also handles the sign-out performed after a successful
-    // password reset.
     if (state.session == null) {
       _checkVersion++;
 
@@ -103,12 +184,13 @@ class _AuthGateState extends State<AuthGate> {
       return;
     }
 
-    // Do not send the user into the normal shop flow while
-    // they are completing password recovery.
+    // Avoid normal shop navigation while a web callback
+    // is being processed.
+    if (_isHandlingWebCallback) return;
+
+    // Do not enter the normal application during recovery.
     if (_isPasswordRecovery) return;
 
-    // Verify shop status when a session is established.
-    // A routine token refresh doesn't require another shop lookup.
     if (state.event == AuthChangeEvent.signedIn ||
         state.event == AuthChangeEvent.initialSession) {
       _checkShop();
@@ -120,15 +202,13 @@ class _AuthGateState extends State<AuthGate> {
   // =========================================================
 
   Future<void> _checkShop() async {
-    // Never perform the normal shop verification during recovery.
-    if (_isPasswordRecovery) return;
+    if (_isPasswordRecovery || _isHandlingWebCallback) return;
 
-    // Identify this request so an older result cannot overwrite
-    // a newer authentication or shop-verification result.
     final version = ++_checkVersion;
 
-    // No signed-in user means there is no shop to check.
-    if (widget.authService.currentUser == null) {
+    final user = widget.authService.currentUser;
+
+    if (user == null) {
       if (!mounted) return;
 
       setState(() {
@@ -140,7 +220,6 @@ class _AuthGateState extends State<AuthGate> {
       return;
     }
 
-    // Show the loading state while checking Supabase.
     setState(() {
       _checkingShop = true;
       _hasShop = null;
@@ -148,13 +227,9 @@ class _AuthGateState extends State<AuthGate> {
     });
 
     try {
-      // Shop verification belongs to ShopService.
       final hasShop = await widget.shopService.hasShop();
 
-      // Ignore outdated results.
       if (!mounted || version != _checkVersion) return;
-
-      // Recovery might have started while the request was running.
       if (_isPasswordRecovery) return;
 
       setState(() {
@@ -163,8 +238,12 @@ class _AuthGateState extends State<AuthGate> {
       });
     } catch (error, stackTrace) {
       if (!mounted || version != _checkVersion) return;
-
       if (_isPasswordRecovery) return;
+
+      debugPrint(
+        'SHOPFLOW: Shop verification failed: '
+        '$error\n$stackTrace',
+      );
 
       setState(() {
         _errorMessage =
@@ -172,10 +251,6 @@ class _AuthGateState extends State<AuthGate> {
             'Check your connection and try again.';
         _checkingShop = false;
       });
-
-      debugPrint(
-        'SHOPFLOW: Shop verification failed: $error\n$stackTrace',
-      );
     }
   }
 
@@ -186,25 +261,13 @@ class _AuthGateState extends State<AuthGate> {
   Future<void> _signOut() async {
     try {
       await widget.authService.signOut();
-
-      // Supabase's authentication stream will notify AuthGate
-      // when the session is cleared.
-      //
-      // _handleAuthState resets the recovery state and returns
-      // the user to the LoginScreen.
     } catch (error, stackTrace) {
-      debugPrint(
-        'SHOPFLOW: Sign out failed: $error\n$stackTrace',
-      );
+      debugPrint('SHOPFLOW: Sign out failed: $error\n$stackTrace');
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Could not sign out. Please try again.',
-          ),
-        ),
+        const SnackBar(content: Text('Could not sign out. Please try again.')),
       );
     }
   }
@@ -216,7 +279,6 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void dispose() {
     _authSubscription?.cancel();
-
     super.dispose();
   }
 
@@ -229,9 +291,6 @@ class _AuthGateState extends State<AuthGate> {
     final user = widget.authService.currentUser;
 
     // 1. PASSWORD RECOVERY
-    //
-    // Show the new-password form before the normal authenticated
-    // application or shop-setup flow.
     if (_isPasswordRecovery && user != null) {
       return UpdatePasswordScreen(
         authService: widget.authService,
@@ -239,16 +298,63 @@ class _AuthGateState extends State<AuthGate> {
       );
     }
 
-    // 2. NO AUTHENTICATED USER
-    if (user == null) {
-      return LoginScreen(
-        authService: widget.authService,
+    // 2. WEB CALLBACK PROCESSING
+    if (_isHandlingWebCallback) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Verifying password-reset link...'),
+            ],
+          ),
+        ),
       );
     }
 
-    // 3. SHOP VERIFICATION LOADING
-    if (_checkingShop ||
-        (_hasShop == null && _errorMessage == null)) {
+    // 3. ERROR
+    if (_errorMessage != null) {
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Icon(Icons.cloud_off_outlined, size: 56),
+                    const SizedBox(height: 16),
+                    Text(_errorMessage!, textAlign: TextAlign.center),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: _checkShop,
+                      child: const Text('Try again'),
+                    ),
+                    TextButton(
+                      onPressed: _signOut,
+                      child: const Text('Sign out'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 4. NO AUTHENTICATED USER
+    if (user == null) {
+      return LoginScreen(authService: widget.authService);
+    }
+
+    // 5. SHOP VERIFICATION LOADING
+    if (_checkingShop || _hasShop == null) {
       return const Scaffold(
         body: Center(
           child: Column(
@@ -263,54 +369,7 @@ class _AuthGateState extends State<AuthGate> {
       );
     }
 
-    // 4. SHOP VERIFICATION FAILED
-    if (_errorMessage != null) {
-      return Scaffold(
-        body: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: 400,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Icon(
-                      Icons.cloud_off_outlined,
-                      size: 56,
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    Text(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    FilledButton(
-                      onPressed: _checkShop,
-                      child: const Text('Try again'),
-                    ),
-
-                    TextButton(
-                      onPressed: _signOut,
-                      child: const Text('Sign out'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    // 5. USER HAS NOT CREATED A SHOP
+    // 6. USER HAS NOT CREATED A SHOP
     if (_hasShop == false) {
       return ShopSetupScreen(
         shopService: widget.shopService,
@@ -319,7 +378,7 @@ class _AuthGateState extends State<AuthGate> {
       );
     }
 
-    // 6. AUTHENTICATED USER WITH A SHOP
+    // 7. AUTHENTICATED USER WITH A SHOP
     return widget.authenticatedBuilder(context);
   }
 }

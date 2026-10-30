@@ -127,10 +127,10 @@ class AuthService {
         'Please enter a valid email address.',
       );
     }
-
     final redirectTo = kIsWeb
-        ? Uri.base.origin
+        ? '${Uri.base.origin}/'
         : 'io.shopflow.app://reset-password';
+
 
     await _repository.sendPasswordRecoveryEmail(
       email: normalizedEmail,
@@ -193,5 +193,11 @@ class AuthService {
     await _repository.updatePasswordAfterRecovery(
       newPassword: newPassword,
     );
+  }  
+
+  Future<AuthSessionUrlResponse> handleAuthCallback(
+    Uri callbackUri,
+  ) {
+    return _repository.handleAuthCallback(callbackUri);
   }  
 }
