@@ -59,4 +59,37 @@ class AuthRepository {
 
     return result != null;
   }
+
+  Future<void> sendPasswordRecoveryEmail({
+    required String email,
+    required String redirectTo,
+  }) async {
+    await _client.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      redirectTo: redirectTo,
+    );
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _client.auth.updateUser(
+      UserAttributes(
+        password: newPassword,
+        currentPassword: currentPassword,
+      ),
+    );
+  }
+
+  Future<void> updatePasswordAfterRecovery({
+    required String newPassword,
+  }) async {
+    await _client.auth.updateUser(
+      UserAttributes(
+        password: newPassword,
+      ),
+    );
+  }
+
 }

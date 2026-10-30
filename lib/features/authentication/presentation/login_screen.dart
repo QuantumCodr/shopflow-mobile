@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shopflow_mobile/features/authentication/presentation/forgot_password_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/validation/email_validator.dart';
@@ -71,14 +72,15 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _openPasswordRecovery() {
-    // TODO: Replace with the actual password-recovery flow.
-    // This placeholder does not send a reset email yet.
+  Future<void> _openPasswordRecovery() async {
     FocusScope.of(context).unfocus();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Password recovery is coming next.'),
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => ForgotPasswordScreen(
+          authService: widget.authService,
+          initialEmail: _email,
+        ),
       ),
     );
   }

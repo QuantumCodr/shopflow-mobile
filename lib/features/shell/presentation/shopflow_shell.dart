@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shopflow_mobile/features/categories/presentation/categories_screen.dart';
 import 'package:shopflow_mobile/features/reports/presentation/reports_screen.dart';
 import 'package:shopflow_mobile/features/sales_history/presentation/sales_history_screen.dart';
+import 'package:shopflow_mobile/features/settings/presentation/settings_screen.dart';
 import 'package:shopflow_mobile/features/stock_movements/presentation/stock_movement_screen.dart';
 
 import '../../../shared/theme/app_colors.dart';
@@ -125,10 +126,9 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
       ProductsScreen(), // 2: products
       InventoryScreen(), // 3: inventory
 
-      const CategoriesScreen(), // categories: index 4 // 4: categories
+      const CategoriesScreen(), // 4: categories
 
-      const StockMovementScreen(), // stockMovements: index 5
-
+      const StockMovementScreen(), // 5: stockMovements
       const SalesHistoryScreen( 
         title: 'Sales History',
         description: 'Review your previous transactions here.',
@@ -137,10 +137,9 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
 
       const ReportsScreen(), // 7: reports
 
-      const _ModulePlaceholder(
-        title: 'Settings',
-        description: 'Manage ShopFlow preferences here.',
-        icon: Icons.settings_outlined,
+      SettingsScreen(
+        onSignOut: _signOut,
+        isSigningOut: _isSigningOut,
       ), // 8: settings
     ];
 
@@ -244,67 +243,6 @@ class _ShopFlowShellState extends State<ShopFlowShell> {
           child: const Icon(
             Icons.point_of_sale_rounded,
             size: 30,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Temporary presentation for modules that haven't been implemented.
-class _ModulePlaceholder extends StatelessWidget {
-  const _ModulePlaceholder({
-    required this.title,
-    required this.description,
-    required this.icon,
-  });
-
-  final String title;
-  final String description;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: 420,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 52,
-                color: AppColors.brand,
-              ),
-              const SizedBox(height: 20),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                description,
-                textAlign: TextAlign.center,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyLarge
-                    ?.copyWith(
-                      color: AppColors.textSecondary,
-                      height: 1.5,
-                    ),
-              ),
-            ],
           ),
         ),
       ),

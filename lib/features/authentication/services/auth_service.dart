@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/validation/email_validator.dart';
@@ -114,4 +114,84 @@ class AuthService {
   String _normalizeEmail(String email) {
     return email.trim().toLowerCase();
   }
+
+
+  /// Requests a password-reset email for the supplied address.
+  Future<void> sendPasswordRecoveryEmail({
+    required String email,
+  }) async {
+    final normalizedEmail = _normalizeEmail(email);
+
+    if (!EmailValidator.isValid(normalizedEmail)) {
+      throw const AuthException(
+        'Please enter a valid email address.',
+      );
+    }
+
+    final redirectTo = kIsWeb
+        ? Uri.base.origin
+        : 'io.shopflow.app://reset-password';
+
+    await _repository.sendPasswordRecoveryEmail(
+      email: normalizedEmail,
+      redirectTo: redirectTo,
+    );
+  }
+
+  /// Changes the password for the currently signed-in account.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    if (currentUser == null) {
+      throw const AuthException(
+        'Please sign in before changing your password.',
+      );
+    }
+
+    if (currentPassword.isEmpty) {
+      throw const AuthException(
+        'Enter your current password.',
+      );
+    }
+
+    if (newPassword.length < 8) {
+      throw const AuthException(
+        'Your new password must contain at least 8 characters.',
+      );
+    }
+
+    if (currentPassword == newPassword) {
+      throw const AuthException(
+        'Your new password must be different from your current password.',
+      );
+    }
+
+    await _repository.changePassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+  }
+
+  /// Sets a new password after a successful recovery-link flow.
+  Future<void> completePasswordRecovery({
+    required String newPassword,
+  }) async {
+    if (currentUser == null) {
+      throw const AuthException(
+        'Your password recovery session is missing or expired. '
+        'Please request a new reset email.',
+      );
+    }
+
+    if (newPassword.length < 8) {
+      throw const AuthException(
+        'Your new password must contain at least 8 characters.',
+      );
+    }
+
+    await _repository.updatePasswordAfterRecovery(
+      newPassword: newPassword,
+    );
+  }  
 }
