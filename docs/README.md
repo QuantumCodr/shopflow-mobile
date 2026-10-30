@@ -1,6 +1,6 @@
 # ShopFlow Documentation
 
-This folder contains the product and engineering documentation for ShopFlow. It is intended for three groups: shop users, contributors and developers maintaining the application.
+This folder contains the product and engineering documentation for ShopFlow. It is intended for shop users, contributors and developers maintaining the application.
 
 ## Read by Role
 
@@ -12,6 +12,7 @@ This folder contains the product and engineering documentation for ShopFlow. It 
 | Understand the database and access rules | [Database and security](DATABASE_AND_SECURITY.md) |
 | Make a code or documentation contribution | [Contributing guide](CONTRIBUTING.md) |
 | Check what is implemented and what remains | [Project status](PROJECT_STATUS.md) |
+| Understand planned future modules | [Phase 2 data model](PHASE_2_DATA_MODEL.md) |
 
 ## Documentation Rules
 
@@ -25,8 +26,8 @@ This folder contains the product and engineering documentation for ShopFlow. It 
 
 For application behaviour, inspect the current Flutter source code. For database structure and permissions, inspect both the checked-in SQL and the SQL installed in the target Supabase project.
 
-The checked-in database file, `SHOPFLOW_DATABASE.sql`, is the single canonical V1 fresh-install definition. It is intended for a new or empty Supabase project. It does not automatically describe the state of an existing or previously modified database.
+`SHOPFLOW_DATABASE.sql` is the single canonical V1 fresh-install database definition. It is intended for a new or empty Supabase project. It does not automatically describe the state of an existing or previously modified database.
 
-The documentation was reviewed against the repository structure and available source files on **30 October 2026**. The current `main` branch includes the web authentication callback handling discussed during development. However, the presence of code in the repository does not by itself prove that password recovery, database functions or deployed Supabase settings have been tested successfully.
+The Phase 2 data model is a planning document, not an implemented database schema. Do not assume that its proposed tables, relationships or workflows exist in the current application.
 
-Before a production release, verify the application workflows against the deployed database and confirm that the Supabase authentication configuration matches the application.
+Documentation should distinguish implemented functionality, planned development and behaviour that still requires verification.
