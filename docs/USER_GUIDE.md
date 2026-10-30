@@ -176,7 +176,7 @@ Settings currently include the shop name, signed-in account email, password-mana
 - Use password recovery when you cannot sign in or need a recovery link.
 - Sign out when you have finished using your account on a shared device.
 
-Password recovery is still undergoing development and verification. Email delivery and recovery-link behaviour depend on the Supabase project's authentication settings.
+Password recovery is available and has been confirmed working in the current development environment. Successful recovery depends on the Supabase email service and correct redirect configuration. If a recovery link expires, request a new one.
 
 Never share a password-reset link with anyone. It contains a one-time authentication credential.
 
