@@ -104,7 +104,7 @@ It includes the application schema, indexes, Row Level Security policies, authen
 
 The SQL definition has been inspected, but a successful fresh installation and end-to-end test against a separate Supabase project are still required.
 
-Do not execute the older `shopflow_supabase_fresh_install.sql` as an alternative setup script. Existing databases should be updated through reviewed incremental migrations.
+SHOPFLOW_DATABASE.sql is the single canonical V1 fresh-install database file. Existing databases should be updated through reviewed incremental migrations.
 
 ## Documentation
 
