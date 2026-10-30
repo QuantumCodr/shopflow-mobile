@@ -132,7 +132,7 @@ The documentation index is available at [docs/README.md](docs/README.md).
 - A complete SQLite cache and offline transaction synchronization are not implemented.
 - Fractional inventory quantities are supported, but POS currently accepts whole-number quantities only.
 - Database installation and business workflows still require end-to-end verification.
-- Password recovery requires testing on both web and Android.
+- Password recovery is working in the current development environment. Re-test the web and Android flows whenever authentication code or Supabase redirect configuration changes.
 - Automated test coverage remains incomplete.
 - V1 supports one shop per account owner; employee roles and multi-shop access are not implemented.
 
