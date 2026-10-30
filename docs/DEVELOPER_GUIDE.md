@@ -1,16 +1,18 @@
-# ShopFlow developer setup guide
+# ShopFlow Developer Setup Guide
 
-This guide is for developers setting up the project locally or preparing a development environment.
+This guide explains how to prepare a local development environment, configure Supabase and run ShopFlow.
 
 ## 1. Prerequisites
 
+You need:
+
 - Git.
-- Flutter SDK with a Dart SDK that satisfies the `environment` constraint in `pubspec.yaml` (`^3.13.4` at the time this guide was prepared).
+- Flutter SDK with a Dart SDK that satisfies the `environment` constraint in `pubspec.yaml` (`^3.13.4` at the time of this guide).
 - Android SDK and an emulator or Android device for Android development.
 - A Supabase project.
 - A code editor such as Visual Studio Code or Android Studio.
 
-Check the installed tools:
+Check your installed tools:
 
 ```powershell
 flutter --version
@@ -18,9 +20,9 @@ dart --version
 flutter doctor
 ```
 
-Resolve Android toolchain issues reported by `flutter doctor` before attempting an Android build.
+Resolve relevant Flutter and Android toolchain issues reported by `flutter doctor` before attempting an Android build.
 
-## 2. Clone and install dependencies
+## 2. Clone the Repository and Install Dependencies
 
 ```powershell
 git clone https://github.com/QuantumCodr/shopflow-mobile.git
@@ -28,78 +30,146 @@ cd shopflow-mobile
 flutter pub get
 ```
 
-## 3. Configure environment variables
+## 3. Configure Environment Variables
 
-Create `.env` from the example file:
+Create a local `.env` file from the example:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Set the values from your Supabase project:
+Open `.env` and enter the values from your Supabase project:
 
 ```dotenv
 SUPABASE_URL=https://YOUR_PROJECT_ID.supabase.co
 SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
 ```
 
-The app reads these values in `lib/main.dart` and passes them to `Supabase.initialize()`.
+The application reads these values in `lib/main.dart` and passes them to `Supabase.initialize()`.
 
-Use a Supabase publishable key in the client. Never put a Supabase service-role key in a Flutter application. Client applications are distributed to end users and cannot keep service-role credentials secret.
+Use a Supabase publishable key in the Flutter client. Never put a service-role key in application code or a client-side environment file. A distributed client application cannot keep service-role credentials secret.
 
-Do not commit `.env`. Check `.gitignore` before committing any local configuration file.
+Do not commit `.env`. The repository provides `.env.example` as a template. You can check whether your local file is ignored by Git with:
+
+```powershell
+git check-ignore .env
+```
 
 ## 4. Prepare Supabase
 
-1. Create or select the Supabase project for the environment.
-2. Review `SHOPFLOW_DATABASE.sql` before executing it.
-3. Use the bootstrap only on a fresh, empty project. Do not rerun it as a migration on a database that already contains data.
-4. Configure Supabase Auth, including the required email provider and redirect URLs for the platforms being tested.
-5. Verify Row Level Security is enabled and the expected policies and database functions exist.
-6. Compare the deployed database functions with the operations called by the Flutter repositories. The app currently calls `receive_stock`, `adjust_stock` and `complete_sale`; the checked-in bootstrap currently defines only `receive_stock` among those three.
+1. Create a new Supabase project or select the project intended for development.
+2. Review the root-level `SHOPFLOW_DATABASE.sql` file.
+3. Run this file only against a new or empty Supabase project.
+4. Configure Supabase Authentication and enable the email provider required by the application.
+5. Configure the authentication redirect URLs described in the next section.
+6. Verify that the expected tables, Row Level Security (RLS) policies and database functions exist.
 
-There are two SQL bootstrap-style files at the repository root. Do not execute both blindly. Treat `SHOPFLOW_DATABASE.sql` as the documented canonical bootstrap and review differences before using the alternative `shopflow_supabase_fresh_install.sql` file.
+`SHOPFLOW_DATABASE.sql` is the single canonical V1 fresh-install database file. It includes the database functions called by the current Flutter repositories:
 
-## 5. Run the app
+- `receive_stock`
+- `adjust_stock`
+- `complete_sale`
 
-### Android
+The functions handle stock receiving, stock adjustments and completed sales through database operations.
 
-Start an emulator or connect an Android device, then run:
+**Important:** Do not run the fresh-install SQL over an existing database or use it as an incremental migration. It is intended for a fresh installation. Existing databases must be updated through properly reviewed migrations.
 
-```powershell
-flutter run
-```
+The repository may also contain the older `shopflow_supabase_fresh_install.sql` file. Treat it as legacy documentation or setup material, not as an alternative to the canonical database file. Do not execute both scripts.
 
-To list connected devices:
+## 5. Configure Authentication Redirects
 
-```powershell
-flutter devices
-```
+ShopFlow uses Supabase Auth for account access and password recovery.
 
-### Browser development
+The current application uses different callback handling for web and native Android.
 
-For authentication callback testing, use a stable web-server origin:
+### Web authentication
+
+For local browser development, start the web server using a stable origin:
 
 ```powershell
 flutter run -d web-server --web-hostname localhost --web-port 7357
 ```
 
-Open `http://localhost:7357` manually in the browser profile where you will also open authentication emails. Keep the same browser profile, hostname and port throughout a PKCE flow. Changing between `localhost` and `127.0.0.1`, changing ports, or opening the link in an isolated browser profile can prevent the browser from finding the PKCE verifier stored for the original origin.
+Open this address manually:
 
-Add the exact local redirect pattern to Supabase Auth URL Configuration. Add the Android custom-scheme redirect separately when testing native Android deep links. The exact redirect must agree with the URL created by `AuthService` and the Android manifest.
+```text
+http://localhost:7357
+```
 
-## 6. Useful development commands
+Add the following redirect URL to the Supabase Authentication URL Configuration:
 
-Format the application:
+```text
+http://localhost:7357/
+```
+
+The web application handles authentication callbacks manually through `AuthGate`. Keep the same browser profile, hostname and port throughout a password-recovery flow.
+
+Changing between `localhost` and `127.0.0.1`, changing ports or opening the recovery email in a different browser profile can prevent the browser from finding the original PKCE verifier.
+
+### Android authentication
+
+The current Android password-recovery redirect is:
+
+```text
+io.shopflow.app://reset-password
+```
+
+Add this URL to the allowed redirect URLs in Supabase Authentication.
+
+The Android manifest also contains an intent filter for this scheme and host. If the redirect changes, keep the following in agreement:
+
+- The redirect created by `AuthService`.
+- The Android manifest intent filter.
+- The allowed redirect URLs in Supabase.
+
+Authentication email delivery and recovery behaviour must be tested against the actual Supabase project configuration.
+
+## 6. Run the Application
+
+### Android
+
+Start an Android emulator or connect a device with USB debugging enabled.
+
+List available devices:
+
+```powershell
+flutter devices
+```
+
+Run ShopFlow:
+
+```powershell
+flutter run
+```
+
+### Browser
+
+Use the web-server command from the authentication section when you need a stable local origin for authentication callback testing:
+
+```powershell
+flutter run -d web-server --web-hostname localhost --web-port 7357
+```
+
+Then open `http://localhost:7357` in your browser.
+
+## 7. Useful Development Commands
+
+Install or refresh dependencies:
+
+```powershell
+flutter pub get
+```
+
+Format Dart source files:
 
 ```powershell
 dart format lib
 ```
 
-Analyze the code:
+Analyze the Flutter project:
 
 ```powershell
-dart analyze
+flutter analyze
 ```
 
 Run automated tests:
@@ -108,15 +178,23 @@ Run automated tests:
 flutter test
 ```
 
+List connected devices:
+
+```powershell
+flutter devices
+```
+
 Run the application:
 
 ```powershell
 flutter run
 ```
 
-A clean `dart analyze` result confirms static analysis only. It does not prove that Supabase authentication, database functions, checkout, email delivery or the full app flow work end to end.
+A successful static analysis result does not prove that Supabase authentication, database functions, checkout, email delivery or complete application workflows work correctly. Test affected workflows against a development Supabase project.
 
-## 7. Project structure
+## 8. Project Structure
+
+The main application source is organised as follows:
 
 ```text
 lib/
@@ -144,19 +222,40 @@ lib/
     theme/
     time/
     widgets/
+
 test/
 docs/
+
+.env.example
 SHOPFLOW_DATABASE.sql
-shopflow_supabase_fresh_install.sql
 ```
 
-Most features follow a presentation, service and data/repository separation. See [Architecture](ARCHITECTURE.md) for the responsibilities of each layer.
+Most features follow a presentation, service, data/repository and models separation:
 
-## 8. Before submitting a change
+- `presentation/` contains screens and user interaction.
+- `services/` contains validation and business-use-case coordination.
+- `data/` contains repositories responsible for Supabase access.
+- `models/` contains typed application data structures.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a fuller explanation of the application layers and their responsibilities.
+
+## 9. Offline Support
+
+The current application relies on Supabase for its working data.
+
+A complete local database cache and offline transaction synchronisation are not implemented. Do not assume that the presence of packages such as `sqflite` or `connectivity_plus` means that offline sales or inventory synchronisation is available.
+
+Maintain an internet connection when performing important shop operations.
+
+## 10. Before Submitting a Change
+
+Before submitting code or documentation changes:
 
 1. Format changed Dart files.
-2. Run `dart analyze`.
-3. Run relevant tests.
+2. Run `flutter analyze`.
+3. Run relevant automated tests.
 4. Manually test affected workflows against a development Supabase project.
-5. Update the documentation when user-visible behaviour, setup, schema, security or architecture changes.
-6. Confirm no secrets or private data are included in the commit.
+5. Update documentation when user-visible behaviour, setup, database contracts, security or architecture changes.
+6. Confirm that no credentials, tokens or private user data are included in the commit.
+
+Database changes should be reviewed separately from application changes. Verify new or modified functions, policies, constraints and repository contracts before treating a database feature as complete.
