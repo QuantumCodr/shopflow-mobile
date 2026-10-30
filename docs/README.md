@@ -1,8 +1,8 @@
-# ShopFlow documentation
+# ShopFlow Documentation
 
-This folder contains the working product and engineering documentation for ShopFlow. It is written for three groups: shop users, contributors and developers maintaining the application.
+This folder contains the product and engineering documentation for ShopFlow. It is intended for three groups: shop users, contributors and developers maintaining the application.
 
-## Read by role
+## Read by Role
 
 | I want to… | Read |
 |---|---|
@@ -13,16 +13,20 @@ This folder contains the working product and engineering documentation for ShopF
 | Make a code or documentation contribution | [Contributing guide](CONTRIBUTING.md) |
 | Check what is implemented and what remains | [Project status](PROJECT_STATUS.md) |
 
-## Documentation rules
+## Documentation Rules
 
-1. Describe the behaviour that exists in the code and database, not only the intended product design.
+1. Describe behaviour that exists in the code and database, not only the intended product design.
 2. Mark planned, incomplete or unverified behaviour clearly.
 3. Update the relevant guide when a feature, database contract, setup step or architectural decision changes.
-4. Keep instructions short and reproducible. Include exact commands and file paths where they help.
+4. Keep instructions short and reproducible. Include exact commands and file paths where useful.
 5. Never include real credentials, user data, recovery links or access tokens.
 
-## Source of truth
+## Source of Truth
 
-For application behaviour, inspect the current Flutter source. For database structure and permissions, inspect the SQL installed in the target Supabase project as well as the checked-in bootstrap. The checked-in SQL is not guaranteed to match an already configured Supabase project.
+For application behaviour, inspect the current Flutter source code. For database structure and permissions, inspect both the checked-in SQL and the SQL installed in the target Supabase project.
 
-The files in this documentation set were prepared against the repository structure inspected on 30 October 2026, together with the current local authentication files pasted during the development conversation. The local `main.dart` and `AuthGate` changes discussed for web password recovery were not yet reflected in the GitHub `main` branch snapshot inspected during this review. Before committing this documentation, push or otherwise reconcile the local application changes so the documented setup and the repository source describe the same version. Recheck database functions and deployed Supabase configuration before a production release.
+The checked-in database file, `SHOPFLOW_DATABASE.sql`, is the single canonical V1 fresh-install definition. It is intended for a new or empty Supabase project. It does not automatically describe the state of an existing or previously modified database.
+
+The documentation was reviewed against the repository structure and available source files on **30 October 2026**. The current `main` branch includes the web authentication callback handling discussed during development. However, the presence of code in the repository does not by itself prove that password recovery, database functions or deployed Supabase settings have been tested successfully.
+
+Before a production release, verify the application workflows against the deployed database and confirm that the Supabase authentication configuration matches the application.
