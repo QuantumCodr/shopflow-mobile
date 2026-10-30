@@ -267,7 +267,7 @@ The following modules are planned for future development and are not part of the
 
 These modules should be designed before implementation so that their relationships with the existing products, inventory, stock movements and sales records are clear.
 
-A dedicated `docs/PHASE_2_DATA_MODEL.md` document is planned to describe the future data model, relationships, business rules and security considerations.
+The proposed future data model, relationships, business rules and security considerations are documented in PHASE_2_DATA_MODEL.md. These modules remain planned and are not implemented in V1.
 
 Phase 2 features should not be added to the V1 database prematurely.
 
@@ -283,7 +283,7 @@ The immediate priorities for ShopFlow are:
 6. Add focused automated tests for important business rules.
 7. Verify RLS using multiple ordinary authenticated users.
 8. Review dashboard and report calculations against real records.
-9. Complete the Phase 2 data model documentation.
+9. Review and refine the Phase 2 data model before beginning implementation.
 10. Decide whether SQLite caching is required for a future release.
 
 ## 11. Release Readiness
