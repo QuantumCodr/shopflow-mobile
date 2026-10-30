@@ -101,17 +101,6 @@ Remaining verification:
 
 **Database structure is defined; complete runtime verification remains outstanding.**
 
-### 3.4 Duplicate bootstrap file
-
-The repository still contains:
-
-`shopflow_supabase_fresh_install.sql`
-
-This is an older alternative bootstrap and does not contain the complete current database functions or the current product-unit list.
-
-Do not execute both SQL files.
-
-`SHOPFLOW_DATABASE.sql` is the canonical V1 database file. The older alternative should be removed or archived after checking whether any contributor workflow depends on it.
 
 ## 4. Application and Database Alignment
 
