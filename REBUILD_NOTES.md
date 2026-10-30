@@ -6,7 +6,9 @@ This document records the replacement documentation set for ShopFlow. The packag
 
 ```text
 README.md
+LICENSE
 REBUILD_NOTES.md
+SHOPFLOW_DATABASE.sql
 docs/
   README.md
   USER_GUIDE.md
@@ -15,6 +17,7 @@ docs/
   DATABASE_AND_SECURITY.md
   CONTRIBUTING.md
   PROJECT_STATUS.md
+  PHASE_2_DATA_MODEL.md
 ```
 
 ## 2. Applying the Documentation
