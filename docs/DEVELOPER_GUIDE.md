@@ -74,7 +74,7 @@ The functions handle stock receiving, stock adjustments and completed sales thro
 
 **Important:** Do not run the fresh-install SQL over an existing database or use it as an incremental migration. It is intended for a fresh installation. Existing databases must be updated through properly reviewed migrations.
 
-The repository may also contain the older `shopflow_supabase_fresh_install.sql` file. Treat it as legacy documentation or setup material, not as an alternative to the canonical database file. Do not execute both scripts.
+SHOPFLOW_DATABASE.sql is the single canonical V1 fresh-install database file. Use it only on a new or empty Supabase project. Update existing databases through reviewed incremental migrations that preserve existing data.
 
 ## 5. Configure Authentication Redirects
 
